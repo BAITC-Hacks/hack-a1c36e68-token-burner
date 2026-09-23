@@ -176,3 +176,40 @@ def test_conflict_confidence_is_graded_by_checkable_evidence():
     # a subject outside the org structure is at most an overlap
     _, found = grade(check("Внешний эксперт", ["B1"], ["B2"]))
     assert found == []  # its functions are not its own either
+
+
+def test_phrase_cuts_the_action_tail_repeated_in_the_object():
+    from backend.agent.match import phrase
+
+    assert phrase("контролировать сроки выполнения", "сроки выполнения графика по проверке") == \
+        "контролировать сроки выполнения графика по проверке"
+    assert phrase("организовать работу проектной команды", "работу проектной команды по проверке") == \
+        "организовать работу проектной команды по проверке"
+    assert phrase("готовить предложения", "предложения для включения в план работ") == \
+        "готовить предложения для включения в план работ"
+    assert phrase("запрашивать информацию", "информация у Руководителей Общества") == \
+        "запрашивать информацию у Руководителей Общества"          # same word, another case
+    assert phrase("анализировать", "результаты непрерывного аудита") == "анализировать результаты непрерывного аудита"
+    assert phrase("вести", "реестр договоров; реестр нарушений") == "вести реестр договоров; реестр нарушений"
+    assert phrase("проводить проверку", "проверку") == "проводить проверку"  # object fully repeated
+    assert phrase("определять цели проверок", "цели проверок, критериев, порядка оценки") == \
+        "определять цели проверок, критериев, порядка оценки"             # punctuation of the cut words is kept
+
+
+def test_findings_use_the_deduplicated_phrase():
+    from backend.agent.schemas import ExtractedFunction
+    from tests.conftest import extraction_for
+
+    before = make_doc("before-1", "before", BASE)
+    after = make_doc("after-1", "after", [c for c in BASE if c[0] != "2.2"])
+    docs = [before, after]
+    extractions = {d.doc_id: extraction_for(d) for d in docs}
+    fn = next(f for f in extractions["before-1"].functions if f.clause_id == "2.2")
+    doubled = fn.model_copy(update={"action": "согласует бюджет", "object": "бюджет затрат блока с финансовой службой"})
+    extractions["before-1"].functions = [doubled if f is fn else f for f in extractions["before-1"].functions]
+    pm = prematch(docs, extractions)
+    client = FakeClient(docs, verdicts=lambda ids, text: [verdict(i, "lost") for i in ids])
+    result, _ = match(docs, extractions, pm, client=client)
+    loss = next(f for f in result.findings if f.type == "loss")
+    assert "«согласует бюджет затрат блока с финансовой службой»" in loss.summary
+    assert "бюджет бюджет" not in loss.summary

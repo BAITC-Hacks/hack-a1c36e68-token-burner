@@ -148,6 +148,24 @@ class MatchResult(BaseModel):
 # --- prompt input ---
 
 
+def _word_key(word: str) -> str:
+    w = normalize(word)
+    return w[:5] if len(w) >= 4 else w  # «информацию» / «информация» compare equal
+
+
+def phrase(action: str, obj: str) -> str:
+    """«action object» for a finding. The extractor sometimes starts the object with the tail of the action
+    («контролировать сроки выполнения» + «сроки выполнения графика»): the overlap is cut once."""
+    a, o = action.split(), obj.split()
+    ka, ko = [_word_key(w) for w in a], [_word_key(w) for w in o]
+    for k in range(min(len(a), len(o)), 0, -1):
+        if ka[-k:] == ko[:k] and any(ka[-k:]):
+            tail = o[k - 1][len(o[k - 1].rstrip(",;:")):]  # keep «проверок,» -> «проверок, критериев»
+            a, o = a[:-1] + [a[-1].rstrip(",;:") + tail], o[k:]
+            break
+    return " ".join(a + o)
+
+
 def _cid(doc_id: str, clause_id: str) -> str:
     return f"[{doc_id}:{clause_id}]"
 
@@ -408,7 +426,7 @@ def _same_activity(performs: list[FnRef], controls: list[FnRef], generic: set[st
 
 
 def _examples(fns: list[FnRef], n: int = 2) -> str:
-    return "; ".join(f"«{f.action} {f.object}» (п. {f.clause_id})" for f in fns[:n])
+    return "; ".join(f"«{phrase(f.action, f.object)}» (п. {f.clause_id})" for f in fns[:n])
 
 
 def grade_conflicts(conflicts: list[Conflict], docs: list[Document], extractions: dict[str, Extraction],
@@ -598,7 +616,10 @@ def _dump_raw(results) -> None:
             "calls": [c.parsed.model_dump() if isinstance(c, LLMCall) else str(c) for c in calls]}
            for g, calls in results]
     settings.jobs_dir.mkdir(parents=True, exist_ok=True)
-    (settings.jobs_dir / "match_raw.json").write_text(json.dumps(raw, ensure_ascii=False, indent=1), encoding="utf-8")
+    text = json.dumps(raw, ensure_ascii=False, indent=1)
+    (settings.jobs_dir / "match_raw.json").write_text(text, encoding="utf-8")  # latest
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    (settings.jobs_dir / f"match_raw_{stamp}.json").write_text(text, encoding="utf-8")  # kept per run
 
 
 def _collect(results) -> tuple[dict[str, Verdict], list[Duplicate], list[Conflict], list[CompositionChange], list, list]:
@@ -680,7 +701,7 @@ def match(docs: list[Document], extractions: dict[str, Extraction], pm: Prematch
                 by_clause[(b.doc_id, b.clause_id)].append(b)
         for (doc_id, clause_id), fns in by_clause.items():
             vs = [verdicts[b.id] for b in fns]
-            what = "; ".join(f"«{b.action} {b.object}»" for b in fns)
+            what = "; ".join(f"«{phrase(b.action, b.object)}»" for b in fns)
             if status == "lost":
                 summary = f"{fns[0].owner_key}: {what} — {NOT_FOUND[0].lower() + NOT_FOUND[1:]}."
                 evidence = [_ev(b) for b in fns]
@@ -698,7 +719,7 @@ def match(docs: list[Document], extractions: dict[str, Extraction], pm: Prematch
         if f and f.status == "transferred":
             moves[(b.owner_key, f.owner_after or "?")].append(b)
     for (src, dst), fns in moves.items():
-        examples = "; ".join(f"«{b.action} {b.object}» (п. {b.clause_id})" for b in fns[:3])
+        examples = "; ".join(f"«{phrase(b.action, b.object)}» (п. {b.clause_id})" for b in fns[:3])
         more = f" и ещё {len(fns) - 3}" if len(fns) > 3 else ""
         evidence = []
         for b in fns[:4]:
@@ -728,7 +749,7 @@ def match(docs: list[Document], extractions: dict[str, Extraction], pm: Prematch
                                       owner_after=_join(sorted(owners)), status="duplicated", comment=d.comment,
                                       evidence=_clean_evidence(evidence, by_id), recommendation=d.recommendation))
         _append(findings, dict(id="", type="duplication", severity=d.severity,
-                                summary=f"Дублирование «{d.action} {d.object}» ({d.area}) у: {', '.join(sorted(owners))}. "
+                                summary=f"Дублирование «{phrase(d.action, d.object)}» ({d.area}) у: {', '.join(sorted(owners))}. "
                                         f"{d.comment}".strip(),
                                 evidence=_dedupe(evidence), function_ids=[fid],
                                 recommendation=d.recommendation))
