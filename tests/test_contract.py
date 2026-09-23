@@ -3,9 +3,8 @@ import json
 from pathlib import Path
 
 import pytest
-from rapidfuzz import fuzz
-
 from backend.agent.schemas import AnalysisResult
+from backend.agent.verify import check_evidence, verify_result
 from backend.config import ROOT, settings
 from backend.ingest import ingest_file
 
@@ -38,11 +37,10 @@ def test_demo_evidence_matches_sample_text(demo):
     evidence = [(f.verified, e) for f in demo.findings for e in f.evidence]
     evidence += [(True, e) for x in demo.units + demo.functions for e in x.evidence]
     for verified, e in evidence:
-        clause = docs[e.doc_id].clause(e.clause_id)
-        assert clause is not None, (e.doc_id, e.clause_id)
-        assert clause.page == e.page
-        score = fuzz.partial_ratio(e.quote, clause.text)
-        assert (score >= settings.quote_min_score) == verified, (e.clause_id, score)
+        assert docs[e.doc_id].clause(e.clause_id).page == e.page
+        assert (check_evidence(e, docs) is None) == verified, (e.clause_id, check_evidence(e, docs))
+    rerun = verify_result(demo, docs)
+    assert [f.verified for f in rerun.findings] == [f.verified for f in demo.findings]
 
 
 def test_loss_wording(demo):
