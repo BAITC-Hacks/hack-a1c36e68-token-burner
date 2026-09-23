@@ -7,91 +7,465 @@
   <title>Контур изменений · Аудит реорганизации</title>
   <style>
     :root{--bg:#f4f5f7;--paper:#fff;--text:#242932;--muted:#616975;--line:#dce0e6;--accent:#3159b8;--tint:#eef3ff;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    [v-cloak]{display:none}button,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.45}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    [v-cloak]{display:none}
+    button,select{font:inherit;color:inherit}
+    button{cursor:pointer}
+    button:disabled{cursor:default;opacity:.45}
     button:focus-visible,select:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
-    button{border:1px solid var(--line);background:var(--paper);border-radius:5px;padding:8px 13px}button:hover{border-color:var(--accent)}
-    a{color:var(--accent)}h1,h2,h3,p{margin:0}h1{font-size:29px;letter-spacing:-.8px;line-height:1.25}h2{font-size:19px;letter-spacing:-.3px}h3{font-size:14px}
+    button{border:1px solid var(--line);background:var(--paper);border-radius:5px;padding:8px 13px}
+    button:hover{border-color:var(--accent)}
+    a{color:var(--accent)}
+    h1,h2,h3,p{margin:0}
+    h1{font-size:29px;letter-spacing:-.8px;line-height:1.25}
+    h2{font-size:19px;letter-spacing:-.3px}
+    h3{font-size:14px}
     .topbar{height:58px;border-bottom:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 32px}
-    .brand{font-weight:750;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}.brand-mark{display:grid;place-items:center;background:var(--accent);color:#fff;width:26px;height:26px;border-radius:4px;font:700 17px var(--mono)}
-    .topbar-note,.muted{color:var(--muted)}.topbar-note{font-size:12px}.workspace{max-width:1440px;padding:28px 32px 40px;margin:auto}
+    .brand{font-weight:750;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}
+    .brand-mark{display:grid;place-items:center;background:var(--accent);color:#fff;width:26px;height:26px;border-radius:4px;font:700 17px var(--mono)}
+    .topbar-note,.muted{color:var(--muted)}
+    .topbar-note{font-size:12px}
+    .workspace{max-width:1440px;padding:28px 32px 40px;margin:auto}
     .eyebrow{font-size:11px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-    .report-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}.state-label{border:1px solid var(--line);padding:5px 10px;border-radius:4px;background:var(--paper);font-size:12px;white-space:nowrap}
+    .report-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}
+    .state-label{border:1px solid var(--line);padding:5px 10px;border-radius:4px;background:var(--paper);font-size:12px;white-space:nowrap}
     .state-label::before{content:"";display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin-right:7px}
-    .stats{display:flex;align-items:baseline;gap:12px;font-size:15px;margin:15px 0 20px;flex-wrap:wrap}.stats strong{font-size:23px;font-weight:650;letter-spacing:-.5px}.stats .separator{color:#a7adb6}.stats .verified{color:var(--accent)}
-    .documents{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}.document-set{border:1px solid var(--line);border-radius:5px;background:var(--paper);padding:12px 16px;display:flex;gap:20px;align-items:baseline}
-    .document-set h2{font-size:11px;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;color:var(--muted)}.document-list{flex:1;min-width:0}.document-line{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap}.document-line+.document-line{margin-top:5px}.document-name{font-weight:600;overflow-wrap:anywhere}.document-meta{font-size:12px;color:var(--muted)}
-    .notice{border:1px solid #bac6df;border-left:3px solid var(--accent);background:var(--tint);padding:12px 16px;border-radius:4px;margin-bottom:18px}.notice ul{margin:6px 0 0;padding-left:20px}.notice strong{display:block}.notice p{margin-top:4px}
-    .tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow-x:auto}.tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:12px 0 13px;white-space:nowrap;color:var(--muted);font-weight:600}
-    .tab:hover{color:var(--text);border-bottom-color:#bac6df}.tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}.count{font-size:11px;margin-left:7px;display:inline-block;padding:1px 6px;border-radius:4px;background:#e8ebef;color:var(--muted);font-variant-numeric:tabular-nums}.tab[aria-selected=true] .count{background:#e0e9fd;color:var(--accent)}
-    .section-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:16px}.section-heading p{margin-top:3px;font-size:13px;color:var(--muted)}.section-meta{color:var(--muted);font-size:12px;white-space:nowrap}
-    .unit-group{display:grid;grid-template-columns:168px minmax(0,1fr);gap:20px;border-top:1px solid var(--line);padding:16px 0}.group-label{display:flex;align-items:baseline;gap:8px}.group-label h3{font-size:13px}.unit-list{display:grid;gap:10px}
-    .unit-card{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:20px;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:13px 16px}.unit-title{font-weight:650}.unit-comment{font-size:13px;color:var(--muted);margin-top:5px}.unit-route{margin-top:6px;font-size:12px;color:var(--muted)}.unit-route span{color:var(--accent);margin:0 6px}
-    .evidence-list{display:flex;gap:6px;flex-wrap:wrap;align-content:start;align-items:start}.evidence-chip{font:12px/1.4 var(--mono);border:1px solid var(--line);border-radius:4px;padding:4px 7px;white-space:nowrap;color:var(--muted);background:#fafbfc}.evidence-chip b{color:var(--text);font-weight:600}.evidence-chip[aria-pressed=true]{color:var(--accent);border-color:var(--accent);background:var(--tint)}.evidence-chip[aria-pressed=true] b{color:var(--accent)}
-    .empty{padding:22px;color:var(--muted);border:1px dashed var(--line);border-radius:5px;text-align:center}.group-empty{font-size:13px;color:var(--muted);padding:2px 0}.footer{border-top:1px solid var(--line);margin-top:24px;padding-top:12px;display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
-    .loading{padding:100px 24px;text-align:center}.spinner{width:22px;height:22px;display:inline-block;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}@keyframes spin{to{transform:rotate(360deg)}}
-    .error{max-width:680px;margin:60px auto}.error button{margin-top:12px}code{font-family:var(--mono)}
-    @media(max-width:800px){.workspace{padding:20px 16px}.topbar{padding:0 16px}.topbar-note{display:none}h1{font-size:24px}.documents{grid-template-columns:1fr}.unit-group{grid-template-columns:1fr;gap:8px}.unit-card{grid-template-columns:1fr;gap:12px}.tabs{gap:20px}.report-heading{align-items:start}.state-label{white-space:normal}.section-meta{display:none}}
-    .filters{display:flex;gap:12px;align-items:end;padding:12px 16px;border:1px solid var(--line);border-bottom:0;background:var(--paper);border-radius:5px 5px 0 0;flex-wrap:wrap}.filter{display:grid;gap:4px;font-size:11px;font-weight:600;color:var(--muted)}select{padding:7px 30px 7px 10px;max-width:340px;background:var(--paper);border:1px solid var(--line);border-radius:4px;font-size:13px}.filter-count{margin-left:auto;font-size:12px;color:var(--muted);padding-bottom:8px}.text-button{color:var(--accent);background:none;border:0;padding:7px 0;font-size:12px}
-    .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:0 0 5px 5px}.functions-table{width:100%;border-collapse:collapse;table-layout:fixed;background:var(--paper);font-size:13px}.functions-table th{text-align:left;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:11px 14px;background:#f9fafb;border-bottom:1px solid var(--line)}.functions-table td{vertical-align:top;padding:14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.functions-table tr:last-child td{border-bottom:0}.function-row{cursor:pointer}.function-row:hover,.function-row.is-expanded{background:#f6f8fc}.function-title{display:flex;text-align:left;gap:9px;align-items:start;border:0;background:none;padding:0;font-weight:600;line-height:1.45}.function-title .chevron{color:var(--accent);min-width:10px}.function-area{display:block;color:var(--muted);font-size:11px;margin:4px 0 0 19px}.owner-list{display:grid;gap:5px}.status-badge{display:inline-block;border:1px solid var(--line);padding:3px 7px;border-radius:4px;font-size:11px;line-height:1.4;background:#f7f8fa}.status-transferred,.status-changed{color:var(--accent);background:var(--tint);border-color:#d1dcf4}.status-lost{border-style:dashed}.status-duplicated{font-weight:650;border-color:#939caa}.conflict-flag{font-size:11px;font-weight:600;display:block;line-height:1.45}.conflict-flag::before{content:'!';display:inline-grid;place-items:center;background:var(--tint);color:var(--accent);border:1px solid #c3d0ed;width:17px;height:17px;border-radius:3px;margin-right:5px}
-    .functions-table .detail-cell{padding:0;background:#fafbfd}.lineage{padding:18px 20px;border-left:3px solid var(--accent)}.lineage-columns{display:grid;grid-template-columns:1fr 1fr;gap:24px}.lineage-column h3{font-size:11px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;color:var(--muted)}.quote-block+.quote-block{margin-top:12px}.quote-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.page-number{font-size:11px;color:var(--muted)}blockquote{margin:8px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);line-height:1.6;font-size:13px}.missing-side{font-size:13px;color:var(--muted);padding:12px;border:1px dashed var(--line);border-radius:4px}.lineage-note{margin-top:14px;font-size:13px}.related-findings{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}.related-findings h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}.related-finding+.related-finding{margin-top:10px}.finding-label{font-size:11px;color:var(--muted);margin-bottom:3px}.finding-label code{font-weight:700;color:var(--text);margin-right:8px}.unverified{border-left:2px dashed #939caa;padding-left:10px}.rejection-inline{color:var(--muted);margin-top:4px}.recommendation{margin-top:12px;padding:10px 12px;background:var(--tint);border-radius:4px;font-size:13px}
-    @media(max-width:800px){.functions-table{min-width:850px}.lineage-columns{gap:16px}select{max-width:280px}}
-    .primary-button{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}.report-paper{max-width:960px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:32px 40px}.markdown{line-height:1.7;overflow-wrap:anywhere}.markdown h1{font-size:25px;line-height:1.35;margin-bottom:20px}.markdown h2{font-size:18px;margin:26px 0 10px;border-bottom:1px solid var(--line);padding-bottom:8px}.markdown h3,.markdown h4,.markdown h5,.markdown h6{font-size:15px;margin:18px 0 8px}.markdown p{margin:12px 0}.markdown ul,.markdown ol{padding-left:24px;margin:12px 0}.markdown li{padding-left:3px;margin:8px 0}.markdown li>ul,.markdown li>ol{margin:5px 0;color:var(--muted)}.markdown strong{font-weight:650}.markdown code{font-size:.9em;background:var(--bg);padding:1px 4px}.markdown .md-table{overflow-x:auto;margin:18px 0}.markdown table{width:100%;border-collapse:collapse;font-size:13px}.markdown th,.markdown td{border:1px solid var(--line);padding:8px 10px;text-align:left}.markdown th{background:var(--bg);font-weight:600}
-    @media(max-width:800px){.report-paper{padding:22px}.markdown h1{font-size:22px}}
+    .stats{display:flex;align-items:baseline;gap:12px;font-size:15px;margin:15px 0 20px;flex-wrap:wrap}
+    .stats strong{font-size:23px;font-weight:650;letter-spacing:-.5px}
+    .stats .separator{color:#a7adb6}
+    .stats .verified{color:var(--accent)}
+    .documents{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+    .document-set{border:1px solid var(--line);border-radius:5px;background:var(--paper);padding:12px 16px;display:flex;gap:20px;align-items:baseline}
+    .document-set h2{font-size:11px;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;color:var(--muted)}
+    .document-list{flex:1;min-width:0}
+    .document-line{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap}
+    .document-line+.document-line{margin-top:5px}
+    .document-name{font-weight:600;overflow-wrap:anywhere}
+    .document-meta{font-size:12px;color:var(--muted)}
+    .notice{border:1px solid #bac6df;border-left:3px solid var(--accent);background:var(--tint);padding:12px 16px;border-radius:4px;margin-bottom:18px}
+    .notice ul{margin:6px 0 0;padding-left:20px}
+    .notice strong{display:block}
+    .notice p{margin-top:4px}
+    .tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow-x:auto}
+    .tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:12px 0 13px;white-space:nowrap;color:var(--muted);font-weight:600}
+    .tab:hover{color:var(--text);border-bottom-color:#bac6df}
+    .tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+    .count{font-size:11px;margin-left:7px;display:inline-block;padding:1px 6px;border-radius:4px;background:#e8ebef;color:var(--muted);font-variant-numeric:tabular-nums}
+    .tab[aria-selected=true] .count{background:#e0e9fd;color:var(--accent)}
+    .section-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:16px}
+    .section-heading p{margin-top:3px;font-size:13px;color:var(--muted)}
+    .section-meta{color:var(--muted);font-size:12px;white-space:nowrap}
+    .unit-group{display:grid;grid-template-columns:168px minmax(0,1fr);gap:20px;border-top:1px solid var(--line);padding:16px 0}
+    .group-label{display:flex;align-items:baseline;gap:8px}
+    .group-label h3{font-size:13px}
+    .unit-list{display:grid;gap:10px}
+    .unit-card{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:20px;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:13px 16px}
+    .unit-title{font-weight:650}
+    .unit-comment{font-size:13px;color:var(--muted);margin-top:5px}
+    .unit-route{margin-top:6px;font-size:12px;color:var(--muted)}
+    .unit-route span{color:var(--accent);margin:0 6px}
+    .evidence-list{display:flex;gap:6px;flex-wrap:wrap;align-content:start;align-items:start}
+    .evidence-chip{font:12px/1.4 var(--mono);border:1px solid var(--line);border-radius:4px;padding:4px 7px;white-space:nowrap;color:var(--muted);background:#fafbfc}
+    .evidence-chip b{color:var(--text);font-weight:600}
+    .evidence-chip[aria-pressed=true]{color:var(--accent);border-color:var(--accent);background:var(--tint)}
+    .evidence-chip[aria-pressed=true] b{color:var(--accent)}
+    .empty{padding:22px;color:var(--muted);border:1px dashed var(--line);border-radius:5px;text-align:center}
+    .group-empty{font-size:13px;color:var(--muted);padding:2px 0}
+    .footer{border-top:1px solid var(--line);margin-top:24px;padding-top:12px;display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
+    .loading{padding:100px 24px;text-align:center}
+    .spinner{width:22px;height:22px;display:inline-block;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .error{max-width:680px;margin:60px auto}
+    .error button{margin-top:12px}
+    code{font-family:var(--mono)}
+    @media(max-width:800px){.workspace{padding:20px 16px}
+    .topbar{padding:0 16px}
+    .topbar-note{display:none}
+    h1{font-size:24px}
+    .documents{grid-template-columns:1fr}
+    .unit-group{grid-template-columns:1fr;gap:8px}
+    .unit-card{grid-template-columns:1fr;gap:12px}
+    .tabs{gap:20px}
+    .report-heading{align-items:start}
+    .state-label{white-space:normal}
+    .section-meta{display:none}}
+    .filters{display:flex;gap:12px;align-items:end;padding:12px 16px;border:1px solid var(--line);border-bottom:0;background:var(--paper);border-radius:5px 5px 0 0;flex-wrap:wrap}
+    .filter{display:grid;gap:4px;font-size:11px;font-weight:600;color:var(--muted)}
+    select{padding:7px 30px 7px 10px;max-width:340px;background:var(--paper);border:1px solid var(--line);border-radius:4px;font-size:13px}
+    .filter-count{margin-left:auto;font-size:12px;color:var(--muted);padding-bottom:8px}
+    .text-button{color:var(--accent);background:none;border:0;padding:7px 0;font-size:12px}
+    .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:0 0 5px 5px}
+    .functions-table{width:100%;border-collapse:collapse;table-layout:fixed;background:var(--paper);font-size:13px}
+    .functions-table th{text-align:left;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:11px 14px;background:#f9fafb;border-bottom:1px solid var(--line)}
+    .functions-table td{vertical-align:top;padding:14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+    .functions-table tr:last-child td{border-bottom:0}
+    .function-row{cursor:pointer}
+    .function-row:hover,.function-row.is-expanded{background:#f6f8fc}
+    .function-title{display:flex;text-align:left;gap:9px;align-items:start;border:0;background:none;padding:0;font-weight:600;line-height:1.45}
+    .function-title .chevron{color:var(--accent);min-width:10px}
+    .function-area{display:block;color:var(--muted);font-size:11px;margin:4px 0 0 19px}
+    .owner-list{display:grid;gap:5px}
+    .status-badge{display:inline-block;border:1px solid var(--line);padding:3px 7px;border-radius:4px;font-size:11px;line-height:1.4;background:#f7f8fa}
+    .status-transferred,.status-changed{color:var(--accent);background:var(--tint);border-color:#d1dcf4}
+    .status-lost{border-style:dashed}
+    .status-duplicated{font-weight:650;border-color:#939caa}
+    .conflict-flag{font-size:11px;font-weight:600;display:block;line-height:1.45}
+    .conflict-flag::before{content:'!';display:inline-grid;place-items:center;background:var(--tint);color:var(--accent);border:1px solid #c3d0ed;width:17px;height:17px;border-radius:3px;margin-right:5px}
+    .functions-table .detail-cell{padding:0;background:#fafbfd}
+    .lineage{padding:18px 20px;border-left:3px solid var(--accent)}
+    .lineage-columns{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+    .lineage-column h3{font-size:11px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;color:var(--muted)}
+    .quote-block+.quote-block{margin-top:12px}
+    .quote-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .page-number{font-size:11px;color:var(--muted)}
+    blockquote{margin:8px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);line-height:1.6;font-size:13px}
+    .missing-side{font-size:13px;color:var(--muted);padding:12px;border:1px dashed var(--line);border-radius:4px}
+    .lineage-note{margin-top:14px;font-size:13px}
+    .related-findings{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+    .related-findings h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+    .related-finding+.related-finding{margin-top:10px}
+    .finding-label{font-size:11px;color:var(--muted);margin-bottom:3px}
+    .finding-label code{font-weight:700;color:var(--text);margin-right:8px}
+    .unverified{border-left:2px dashed #939caa;padding-left:10px}
+    .rejection-inline{color:var(--muted);margin-top:4px}
+    .recommendation{margin-top:12px;padding:10px 12px;background:var(--tint);border-radius:4px;font-size:13px}
+    @media(max-width:800px){.functions-table{min-width:850px}
+    .lineage-columns{gap:16px}
+    select{max-width:280px}}
+    .primary-button{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+    .report-paper{max-width:960px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:32px 40px}
+    .markdown{line-height:1.7;overflow-wrap:anywhere}
+    .markdown h1{font-size:25px;line-height:1.35;margin-bottom:20px}
+    .markdown h2{font-size:18px;margin:26px 0 10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+    .markdown h3,.markdown h4,.markdown h5,.markdown h6{font-size:15px;margin:18px 0 8px}
+    .markdown p{margin:12px 0}
+    .markdown ul,.markdown ol{padding-left:24px;margin:12px 0}
+    .markdown li{padding-left:3px;margin:8px 0}
+    .markdown li>ul,.markdown li>ol{margin:5px 0;color:var(--muted)}
+    .markdown strong{font-weight:650}
+    .markdown code{font-size:.9em;background:var(--bg);padding:1px 4px}
+    .markdown .md-table{overflow-x:auto;margin:18px 0}
+    .markdown table{width:100%;border-collapse:collapse;font-size:13px}
+    .markdown th,.markdown td{border:1px solid var(--line);padding:8px 10px;text-align:left}
+    .markdown th{background:var(--bg);font-weight:600}
+    @media(max-width:800px){.report-paper{padding:22px}
+    .markdown h1{font-size:22px}}
     @page{size:A4;margin:16mm}
-    @media print{body{background:#fff;color:#000;font-size:10pt}.topbar,.tabs,.footer,.section-heading,#panel-structure,#panel-functions,#panel-rejected{display:none!important}.workspace{padding:0;max-width:none}.result-header{margin-bottom:24px}.report-heading h1{font-size:20pt}.eyebrow,.state-label{font-size:9pt}.stats{font-size:10pt;gap:7px;margin:12px 0}.stats strong{font-size:13pt}.stats .verified{color:#000}.documents{gap:10px}.document-set{display:block;padding:8px}.document-set h2{margin-bottom:5px}.document-meta{font-size:8pt}.notice{background:#fff;color:#000}.notice,.documents{break-inside:avoid}#panel-conclusion{display:block!important}.report-paper{border:0;padding:0;max-width:none}.markdown{font-size:10pt;line-height:1.55}.markdown h1{font-size:18pt}.markdown h2{font-size:13pt}.markdown h1,.markdown h2,.markdown h3{break-after:avoid}.markdown p,.markdown li{orphans:3;widows:3}.markdown table{font-size:9pt}.markdown tr{break-inside:avoid}.markdown thead{display:table-header-group}.markdown .md-table{overflow:visible}}
+    @media print{body{background:#fff;color:#000;font-size:10pt}
+    .topbar,.tabs,.footer,.section-heading,#panel-structure,#panel-functions,#panel-rejected{display:none!important}
+    .workspace{padding:0;max-width:none}
+    .result-header{margin-bottom:24px}
+    .report-heading h1{font-size:20pt}
+    .eyebrow,.state-label{font-size:9pt}
+    .stats{font-size:10pt;gap:7px;margin:12px 0}
+    .stats strong{font-size:13pt}
+    .stats .verified{color:#000}
+    .documents{gap:10px}
+    .document-set{display:block;padding:8px}
+    .document-set h2{margin-bottom:5px}
+    .document-meta{font-size:8pt}
+    .notice{background:#fff;color:#000}
+    .notice,.documents{break-inside:avoid}
+    #panel-conclusion{display:block!important}
+    .report-paper{border:0;padding:0;max-width:none}
+    .markdown{font-size:10pt;line-height:1.55}
+    .markdown h1{font-size:18pt}
+    .markdown h2{font-size:13pt}
+    .markdown h1,.markdown h2,.markdown h3{break-after:avoid}
+    .markdown p,.markdown li{orphans:3;widows:3}
+    .markdown table{font-size:9pt}
+    .markdown tr{break-inside:avoid}
+    .markdown thead{display:table-header-group}
+    .markdown .md-table{overflow:visible}}
+    .rejected-list{display:grid;gap:14px}
+    .rejected-card{padding:20px 22px;background:var(--paper);border:1px solid var(--line);border-left:3px solid #939caa;border-radius:5px}
+    .rejected-heading{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+    .rejected-heading code{font-weight:700}
+    .rejected-heading .muted{font-size:12px}
+    .rejected-summary{font-size:15px;font-weight:600;line-height:1.6}
+    .rejection-reason{margin:14px 0;padding:12px 14px;background:var(--bg);border:1px dashed #bac1cc;border-radius:4px;font-size:13px}
+    .rejection-reason strong{display:block;margin-bottom:4px}
+    .rejected-evidence{display:grid;gap:10px;margin-top:16px}
+    .rejected-evidence h3{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+    .function-links{margin-top:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}
+    .function-link{padding:5px 8px;color:var(--accent);font-size:12px;text-align:left}
+    .no-link{color:var(--muted)}
+    @media print{.markdown h1,.markdown h2,.markdown h3{page-break-after:avoid}
+    .markdown h2+ul,.markdown h2+ol,.markdown h2+ul>li:first-child,.markdown h2+ol>li:first-child{break-before:avoid;page-break-before:avoid}}
     @media(prefers-reduced-motion:reduce){.spinner{animation:none}}
   </style>
+  <!-- Vendored Vue 3.5.43 production global build; no external runtime requests. -->
   <script src="vendor/vue.global.prod.js"></script>
 </head>
 <body>
   <noscript>Для просмотра результатов включите JavaScript в браузере.</noscript>
   <div id="app" v-cloak>
-    <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">≋</span>Контур изменений</div><span class="topbar-note">Аудит организационных документов</span></header>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">≋</span>Контур изменений</div>
+      <span class="topbar-note">Аудит организационных документов</span>
+    </header>
     <main class="workspace">
-      <div v-if="loading" class="loading" role="status"><span class="spinner" aria-hidden="true"></span><p>Загружаем результат анализа…</p></div>
-      <div v-else-if="error" class="notice error" role="alert"><strong>Не удалось загрузить результат</strong><p>{{ error }}</p><button @click="loadResult">Повторить</button></div>
+      <div v-if="loading" class="loading" role="status">
+        <span class="spinner" aria-hidden="true">
+        </span>
+        <p>Загружаем результат анализа…</p>
+      </div>
+      <div v-else-if="error" class="notice error" role="alert">
+        <strong>Не удалось загрузить результат</strong>
+        <p>{{ error }}</p>
+        <button @click="loadResult">Повторить</button>
+      </div>
       <template v-else-if="result">
         <header class="result-header">
-          <div class="report-heading"><div><p class="eyebrow">Результат сравнения</p><h1>Анализ реорганизации</h1></div><span class="state-label">{{ result.analysis_complete ? 'Анализ завершён' : 'Неполный анализ' }}</span></div>
-          <div class="stats" aria-label="Статистика выводов"><span><strong>{{ result.stats.findings_total }}</strong> выводов</span><span class="separator">·</span><span class="verified"><strong>{{ result.stats.verified }}</strong> подтверждено</span><span class="separator">·</span><span><strong>{{ result.stats.rejected }}</strong> отклонено верификатором</span></div>
-          <div v-if="!result.analysis_complete || result.warnings.length" class="notice" role="status">
-            <template v-if="!result.analysis_complete"><strong>Анализ неполный</strong><p>Часть документов не обработана. Отсутствие функции в комплекте «после» нельзя считать подтверждённым.</p></template>
-            <strong v-else>Предупреждения анализа</strong><ul v-if="result.warnings.length"><li v-for="(warning,index) in result.warnings" :key="index">{{ warning }}</li></ul>
+          <div class="report-heading">
+            <div>
+              <p class="eyebrow">Результат сравнения</p>
+              <h1>Анализ реорганизации</h1>
+            </div>
+            <span class="state-label">{{ result.analysis_complete ? 'Анализ завершён' : 'Неполный анализ' }}</span>
           </div>
-          <div class="documents"><section v-for="side in sides" :key="side.id" class="document-set"><h2>{{ side.label }}</h2><div class="document-list"><div v-for="doc in documentsFor(side.id)" :key="doc.doc_id" class="document-line"><span class="document-name">{{ doc.name }}</span><span class="document-meta"><code>{{ doc.doc_id }}</code> · <template v-if="doc.pages != null">{{ doc.pages }} стр. · </template>{{ doc.clause_count }} пунктов</span></div><span v-if="!documentsFor(side.id).length" class="muted">Документы не указаны</span></div></section></div>
+          <div class="stats" aria-label="Статистика выводов">
+            <span>
+              <strong>{{ result.stats.findings_total }}</strong> выводов</span>
+            <span class="separator">·</span>
+            <span class="verified">
+              <strong>{{ result.stats.verified }}</strong> подтверждено</span>
+            <span class="separator">·</span>
+            <span>
+              <strong>{{ result.stats.rejected }}</strong> отклонено верификатором</span>
+          </div>
+          <div v-if="!result.analysis_complete || result.warnings.length" class="notice" role="status">
+            <template v-if="!result.analysis_complete">
+              <strong>Анализ неполный</strong>
+              <p>Часть документов не обработана. Отсутствие функции в комплекте «после» нельзя считать подтверждённым.</p>
+            </template>
+            <strong v-else>Предупреждения анализа</strong>
+            <ul v-if="result.warnings.length">
+              <li v-for="(warning,index) in result.warnings" :key="index">{{ warning }}</li>
+            </ul>
+          </div>
+          <div class="documents">
+            <section v-for="side in sides" :key="side.id" class="document-set">
+              <h2>{{ side.label }}</h2>
+              <div class="document-list">
+                <div v-for="doc in documentsFor(side.id)" :key="doc.doc_id" class="document-line">
+                  <span class="document-name">{{ doc.name }}</span>
+                  <span class="document-meta">
+                    <code>{{ doc.doc_id }}</code> · <template v-if="doc.pages != null">{{ doc.pages }} стр. · </template>{{ doc.clause_count }} пунктов</span>
+                </div>
+                <span v-if="!documentsFor(side.id).length" class="muted">Документы не указаны</span>
+              </div>
+            </section>
+          </div>
         </header>
         <nav class="tabs" role="tablist" aria-label="Разделы результата">
-          <button v-for="(tab,index) in tabs" :key="tab.id" :id="'tab-'+tab.id" role="tab" class="tab" :aria-selected="activeTab===tab.id" :aria-controls="'panel-'+tab.id" :tabindex="activeTab===tab.id ? 0 : -1" @click="activeTab=tab.id" @keydown="tabKey($event,index)">{{ tab.label }}<span v-if="tab.count != null" class="count">{{ tab.count }}</span></button>
+          <button v-for="(tab,index) in tabs" :key="tab.id" :id="'tab-'+tab.id" role="tab" class="tab" :aria-selected="activeTab===tab.id" :aria-controls="'panel-'+tab.id" :tabindex="activeTab===tab.id ? 0 : -1" @click="activeTab=tab.id" @keydown="tabKey($event,index)">{{ tab.label }}<span v-if="tab.count != null" class="count">{{ tab.count }}</span>
+          </button>
         </nav>
         <section v-show="activeTab==='structure'" id="panel-structure" role="tabpanel" aria-labelledby="tab-structure" tabindex="0">
-          <div class="section-heading"><div><h2>Изменения структуры</h2><p>Подразделения и должности в двух редакциях документов.</p></div><span class="section-meta">{{ result.units.length }} объектов сравнения</span></div>
-          <section v-for="group in unitGroups" :key="group.id" class="unit-group"><div class="group-label"><h3>{{ group.label }}</h3><span class="count">{{ group.units.length }}</span></div><div class="unit-list">
-            <article v-for="(unit,index) in group.units" :key="index" class="unit-card"><div><h3 class="unit-title">{{ unit.name }}</h3><p v-if="unit.before_ref && unit.after_ref && unit.before_ref!==unit.after_ref" class="unit-route">{{ unit.before_ref }} <span>→</span> {{ unit.after_ref }}</p><p v-if="unit.comment" class="unit-comment">{{ unit.comment }}</p></div><div class="evidence-list"><evidence-chip v-for="(ev,i) in unit.evidence" :key="i" :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)"></evidence-chip><span v-if="!unit.evidence?.length" class="muted">Ссылки не указаны</span></div></article>
-            <p v-if="!group.units.length" class="group-empty">Нет подразделений с этим статусом</p>
-          </div></section>
+          <div class="section-heading">
+            <div>
+              <h2>Изменения структуры</h2>
+              <p>Подразделения и должности в двух редакциях документов.</p>
+            </div>
+            <span class="section-meta">{{ result.units.length }} объектов сравнения</span>
+          </div>
+          <section v-for="group in unitGroups" :key="group.id" class="unit-group">
+            <div class="group-label">
+              <h3>{{ group.label }}</h3>
+              <span class="count">{{ group.units.length }}</span>
+            </div>
+            <div class="unit-list">
+              <article v-for="(unit,index) in group.units" :key="index" class="unit-card">
+                <div>
+                  <h3 class="unit-title">{{ unit.name }}</h3>
+                  <p v-if="unit.before_ref && unit.after_ref && unit.before_ref!==unit.after_ref" class="unit-route">{{ unit.before_ref }} <span>→</span> {{ unit.after_ref }}</p>
+                  <p v-if="unit.comment" class="unit-comment">{{ unit.comment }}</p>
+                </div>
+                <div class="evidence-list">
+                  <evidence-chip v-for="(ev,i) in unit.evidence" :key="i" :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)">
+                  </evidence-chip>
+                  <span v-if="!unit.evidence?.length" class="muted">Ссылки не указаны</span>
+                </div>
+              </article>
+              <p v-if="!group.units.length" class="group-empty">Нет подразделений с этим статусом</p>
+            </div>
+          </section>
         </section>
         <section v-show="activeTab==='functions'" id="panel-functions" role="tabpanel" aria-labelledby="tab-functions" tabindex="0">
-          <div class="section-heading"><div><h2>Функции и ответственность</h2><p>Раскройте строку, чтобы сопоставить пункты документов и связанные выводы.</p></div><span class="section-meta">{{ result.functions.length }} функций</span></div>
-          <div class="filters"><label class="filter">Статус<select v-model="statusFilter"><option value="">Все статусы</option><option v-for="(label,status) in functionLabels" :value="status" :key="status">{{ label }}</option></select></label><label class="filter">Подразделение<select v-model="unitFilter"><option value="">Все подразделения</option><option v-for="unit in unitOptions" :key="unit.label" :value="unit.label">{{ unit.label }}</option></select></label><button v-if="statusFilter || unitFilter" class="text-button" @click="resetFilters">Сбросить фильтры</button><span class="filter-count" role="status">Показано {{ filteredFunctions.length }} из {{ result.functions.length }}</span></div>
-          <div class="table-wrap"><table class="functions-table"><colgroup><col style="width:31%"><col style="width:17%"><col style="width:22%"><col style="width:16%"><col style="width:14%"></colgroup><thead><tr><th scope="col">Функция</th><th scope="col">Было</th><th scope="col">Стало</th><th scope="col">Статус</th><th scope="col">Конфликт</th></tr></thead><tbody>
-            <template v-for="fn in filteredFunctions" :key="fn.id">
-              <tr class="function-row" :class="{'is-expanded':expandedFunction===fn.id}" @click="toggleFunction(fn.id)"><td><button class="function-title" :id="'function-'+fn.id" :aria-expanded="expandedFunction===fn.id" :aria-controls="'lineage-'+fn.id" @click.stop="toggleFunction(fn.id)"><span class="chevron" aria-hidden="true">{{ expandedFunction===fn.id ? '−' : '+' }}</span><span>{{ fn.action }} {{ fn.object }}</span></button><span class="function-area">{{ fn.area }}</span></td><td><div class="owner-list"><span v-for="owner in owners(fn.owner_before)" :key="owner">{{ owner }}</span></div><span v-if="!fn.owner_before" class="muted">Не указан</span></td><td><div class="owner-list"><span v-for="owner in owners(fn.owner_after)" :key="owner">{{ owner }}</span></div><span v-if="!fn.owner_after" class="muted">Не указан</span></td><td><span class="status-badge" :class="'status-'+fn.status">{{ functionLabels[fn.status] || fn.status }}</span></td><td><span v-if="fn.conflict_of_interest" class="conflict-flag">Кандидат на проверку сотрудником</span><span v-else class="muted" aria-label="Не отмечен">—</span></td></tr>
-              <tr v-if="expandedFunction===fn.id"><td colspan="5" class="detail-cell"><div class="lineage" :id="'lineage-'+fn.id">
-                <div class="lineage-columns"><section v-for="side in sides" :key="side.id" class="lineage-column"><h3>{{ side.id==='before' ? 'Ред. до' : 'Ред. после' }}</h3><div v-for="(ev,index) in evidenceFor(fn,side.id)" :key="index" class="quote-block"><div class="quote-meta"><evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)"></evidence-chip><span v-if="ev.page != null" class="page-number">Стр. {{ ev.page }}</span></div><blockquote>{{ ev.quote }}</blockquote></div><p v-if="!evidenceFor(fn,side.id).length" class="missing-side">{{ side.id==='after' ? 'не найдена в комплекте "после"' : 'не найдена в комплекте "до"' }}</p></section></div>
-                <p v-if="fn.comment" class="lineage-note">{{ fn.comment }}</p><p v-if="fn.recommendation" class="recommendation"><strong>Рекомендация:</strong> {{ fn.recommendation }}</p>
-                <section v-if="findingsFor(fn.id).length" class="related-findings"><h3>Связанные выводы</h3><article v-for="finding in findingsFor(fn.id)" :key="finding.id" class="related-finding" :class="{unverified:!finding.verified}"><p class="finding-label"><code>{{ finding.id }}</code>{{ finding.verified ? 'Подтверждено верификатором' : 'Отклонено верификатором' }}</p><p>{{ finding.summary }}</p><p v-if="!finding.verified" class="rejection-inline">{{ finding.rejection_reason || 'Причина отклонения не указана.' }}</p></article></section>
-              </div></td></tr>
-            </template>
-            <tr v-if="!filteredFunctions.length"><td colspan="5"><div class="empty">{{ result.functions.length ? 'Нет функций, соответствующих фильтрам.' : 'В результате нет функций для сравнения.' }}</div></td></tr>
-          </tbody></table></div>
+          <div class="section-heading">
+            <div>
+              <h2>Функции и ответственность</h2>
+              <p>Раскройте строку, чтобы сопоставить пункты документов и связанные выводы.</p>
+            </div>
+            <span class="section-meta">{{ result.functions.length }} функций</span>
+          </div>
+          <div class="filters">
+            <label class="filter">Статус<select v-model="statusFilter">
+                <option value="">Все статусы</option>
+                <option v-for="(label,status) in functionLabels" :value="status" :key="status">{{ label }}</option>
+              </select>
+            </label>
+            <label class="filter">Подразделение<select v-model="unitFilter">
+                <option value="">Все подразделения</option>
+                <option v-for="unit in unitOptions" :key="unit.label" :value="unit.label">{{ unit.label }}</option>
+              </select>
+            </label>
+            <button v-if="statusFilter || unitFilter" class="text-button" @click="resetFilters">Сбросить фильтры</button>
+            <span class="filter-count" role="status">Показано {{ filteredFunctions.length }} из {{ result.functions.length }}</span>
+          </div>
+          <div class="table-wrap">
+            <table class="functions-table">
+              <colgroup>
+                <col style="width:31%">
+                <col style="width:17%">
+                <col style="width:22%">
+                <col style="width:16%">
+                <col style="width:14%">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">Функция</th>
+                  <th scope="col">Было</th>
+                  <th scope="col">Стало</th>
+                  <th scope="col">Статус</th>
+                  <th scope="col">Конфликт</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template v-for="fn in filteredFunctions" :key="fn.id">
+                  <tr class="function-row" :class="{'is-expanded':expandedFunction===fn.id}" @click="toggleFunction(fn.id)">
+                    <td>
+                      <button class="function-title" :id="'function-'+fn.id" :aria-expanded="expandedFunction===fn.id" :aria-controls="'lineage-'+fn.id" @click.stop="toggleFunction(fn.id)">
+                        <span class="chevron" aria-hidden="true">{{ expandedFunction===fn.id ? '−' : '+' }}</span>
+                        <span>{{ fn.action }} {{ fn.object }}</span>
+                      </button>
+                      <span class="function-area">{{ fn.area }}</span>
+                    </td>
+                    <td>
+                      <div class="owner-list">
+                        <span v-for="owner in owners(fn.owner_before)" :key="owner">{{ owner }}</span>
+                      </div>
+                      <span v-if="!fn.owner_before" class="muted">Не указан</span>
+                    </td>
+                    <td>
+                      <div class="owner-list">
+                        <span v-for="owner in owners(fn.owner_after)" :key="owner">{{ owner }}</span>
+                      </div>
+                      <span v-if="!fn.owner_after" class="muted">Не указан</span>
+                    </td>
+                    <td>
+                      <span class="status-badge" :class="'status-'+fn.status">{{ functionLabels[fn.status] || fn.status }}</span>
+                    </td>
+                    <td>
+                      <span v-if="fn.conflict_of_interest" class="conflict-flag">Кандидат на проверку сотрудником</span>
+                      <span v-else class="muted" aria-label="Не отмечен">—</span>
+                    </td>
+                  </tr>
+                  <tr v-if="expandedFunction===fn.id">
+                    <td colspan="5" class="detail-cell">
+                      <div class="lineage" :id="'lineage-'+fn.id">
+                        <div class="lineage-columns">
+                          <section v-for="side in sides" :key="side.id" class="lineage-column">
+                            <h3>{{ side.id==='before' ? 'Ред. до' : 'Ред. после' }}</h3>
+                            <div v-for="(ev,index) in evidenceFor(fn,side.id)" :key="index" class="quote-block">
+                              <div class="quote-meta">
+                                <evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)">
+                                </evidence-chip>
+                                <span v-if="ev.page != null" class="page-number">Стр. {{ ev.page }}</span>
+                              </div>
+                              <blockquote>{{ ev.quote }}</blockquote>
+                            </div>
+                            <p v-if="!evidenceFor(fn,side.id).length" class="missing-side">{{ side.id==='after' ? 'не найдена в комплекте "после"' : 'не найдена в комплекте "до"' }}</p>
+                          </section>
+                        </div>
+                        <p v-if="fn.comment" class="lineage-note">{{ fn.comment }}</p>
+                        <p v-if="fn.recommendation" class="recommendation">
+                          <strong>Рекомендация:</strong> {{ fn.recommendation }}</p>
+                        <section v-if="findingsFor(fn.id).length" class="related-findings">
+                          <h3>Связанные выводы</h3>
+                          <article v-for="finding in findingsFor(fn.id)" :key="finding.id" class="related-finding" :class="{unverified:!finding.verified}">
+                            <p class="finding-label">
+                              <code>{{ finding.id }}</code>{{ finding.verified ? 'Подтверждено верификатором' : 'Отклонено верификатором' }}</p>
+                            <p>{{ finding.summary }}</p>
+                            <p v-if="!finding.verified" class="rejection-inline">{{ finding.rejection_reason || 'Причина отклонения не указана.' }}</p>
+                          </article>
+                        </section>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr v-if="!filteredFunctions.length">
+                  <td colspan="5">
+                    <div class="empty">{{ result.functions.length ? 'Нет функций, соответствующих фильтрам.' : 'В результате нет функций для сравнения.' }}</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
         <section v-show="activeTab==='conclusion'" id="panel-conclusion" role="tabpanel" aria-labelledby="tab-conclusion" tabindex="0">
-          <div class="section-heading"><div><h2>Заключение</h2><p>Итоговый отчёт по подтверждённым выводам.</p></div><button class="primary-button" :disabled="!result.conclusion_md.trim()" @click="printConclusion" title="Открыть печатную версию и сохранить в PDF">Скачать <span aria-hidden="true">↓</span></button></div>
-          <article v-if="result.conclusion_md.trim()" class="report-paper markdown" v-html="conclusionHtml"></article><div v-else class="empty">Заключение ещё не сформировано.</div>
+          <div class="section-heading">
+            <div>
+              <h2>Заключение</h2>
+              <p>Итоговый отчёт по подтверждённым выводам.</p>
+            </div>
+            <button class="primary-button" :disabled="!result.conclusion_md.trim()" @click="printConclusion" title="Открыть печатную версию и сохранить в PDF">Скачать <span aria-hidden="true">↓</span>
+            </button>
+          </div>
+          <article v-if="result.conclusion_md.trim()" class="report-paper markdown" v-html="conclusionHtml">
+          </article>
+          <div v-else class="empty">Заключение ещё не сформировано.</div>
         </section>
-        <!-- Rejected tab -->
-        <footer class="footer"><span>Каждый вывод связан с пунктами исходных документов.</span><span>{{ localDemo ? 'Демонстрационный результат' : 'Результат анализа' }}</span></footer>
+        <section v-show="activeTab==='rejected'" id="panel-rejected" role="tabpanel" aria-labelledby="tab-rejected" tabindex="0">
+          <div class="section-heading">
+            <div>
+              <h2>Отклонено верификатором</h2>
+              <p>Эти выводы не прошли проверку цитат и не включены в заключение.</p>
+            </div>
+            <span class="section-meta">Выводов: {{ rejectedFindings.length }}</span>
+          </div>
+          <div class="rejected-list">
+            <article v-for="finding in rejectedFindings" :key="finding.id" class="rejected-card">
+              <header class="rejected-heading">
+                <code>{{ finding.id }}</code>
+                <span class="status-badge">Отклонено</span>
+                <span class="muted">{{ findingTypes[finding.type] }} · Важность: {{ severityLabels[finding.severity] }}</span>
+              </header>
+              <h3 class="rejected-summary">{{ finding.summary }}</h3>
+              <div class="rejection-reason">
+                <strong>Причина отклонения</strong>{{ finding.rejection_reason || 'Причина отклонения не указана.' }}</div>
+              <p v-if="finding.recommendation" class="muted">Предложенная рекомендация: {{ finding.recommendation }}</p>
+              <section v-if="finding.evidence?.length" class="rejected-evidence">
+                <h3>Цитаты отклонённого вывода</h3>
+                <div v-for="(ev,index) in finding.evidence" :key="index">
+                  <div class="quote-meta">
+                    <evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)">
+                    </evidence-chip>
+                    <span v-if="ev.page != null" class="page-number">Стр. {{ ev.page }}</span>
+                  </div>
+                  <blockquote>{{ ev.quote }}</blockquote>
+                </div>
+              </section>
+              <div v-if="finding.function_ids?.length" class="function-links">
+                <span class="muted">Связанные функции:</span>
+                <template v-for="id in finding.function_ids" :key="id">
+                  <button v-if="functionById(id)" class="function-link" @click="openFunction(id)">
+                    <code>{{ id }}</code> · {{ functionById(id).action }} {{ functionById(id).object }} →</button>
+                  <span v-else class="no-link">
+                    <code>{{ id }}</code> · отсутствует в результате</span>
+                </template>
+              </div>
+            </article>
+            <div v-if="!rejectedFindings.length" class="empty">Нет отклонённых выводов.</div>
+          </div>
+        </section>
+        <footer class="footer">
+          <span>Каждый вывод связан с пунктами исходных документов.</span>
+          <span>{{ localDemo ? 'Демонстрационный результат' : 'Результат анализа' }}</span>
+        </footer>
       </template>
     </main>
   </div>
@@ -155,6 +529,16 @@
         const localDemo = new URLSearchParams(location.search).get('demo') !== '1';
         const statusFilter=ref(''), unitFilter=ref(''), expandedFunction=ref(null);
         const functionLabels={preserved:'Сохранена',transferred:'Передана',changed:'Изменена',lost:'Не найдена в комплекте «после»',duplicated:'Дублируется'};
+        const findingTypes={loss:'Не найдена в комплекте «после»',transfer:'Перенос',duplication:'Дублирование',conflict:'Конфликт интересов',structure:'Структура'};
+        const severityLabels={high:'высокая',medium:'средняя',low:'низкая'};
+        const rejectedFindings=computed(() => (result.value?.findings || []).filter(finding => finding.verified!==true));
+        const functionById=id => result.value.functions.find(fn => fn.id===id);
+        async function openFunction(id) {
+          resetFilters(); activeTab.value='functions'; expandedFunction.value=id;
+          await nextTick();
+          const button=document.getElementById('function-'+id);
+          button?.scrollIntoView({block:'center'}); button?.focus({preventScroll:true});
+        }
         const owners=value => (value || '').split(';').map(s => s.trim()).filter(Boolean);
         const normalized=value => ' '+value.toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim()+' ';
         const matchesUnit=(owner,unit) => unit.aliases.some(alias => normalized(owner).includes(normalized(alias)));
@@ -182,7 +566,8 @@
         const tabs = computed(() => [
           {id:'structure',label:'Структура',count:result.value?.units.length},
           {id:'functions',label:'Функции',count:result.value?.functions.length},
-          {id:'conclusion',label:'Заключение'}
+          {id:'conclusion',label:'Заключение'},
+          {id:'rejected',label:'Отклонено верификатором',count:rejectedFindings.value.length}
         ]);
         const unitGroups = computed(() => Object.entries(unitLabels).map(([id,label]) => ({id,label,units:result.value?.units.filter(u => u.status===id) || []})));
         const documentsFor = side => result.value.documents.filter(doc => doc.side===side);
@@ -209,7 +594,8 @@
         }
         onMounted(loadResult);
         return {result,loading,error,activeTab,selectedEvidence,localDemo,sides,tabs,unitGroups,documentsFor,evidenceKey,selectEvidence,tabKey,loadResult,
-          statusFilter,unitFilter,expandedFunction,functionLabels,owners,unitOptions,filteredFunctions,evidenceFor,findingsFor,toggleFunction,resetFilters,conclusionHtml,printConclusion};
+          statusFilter,unitFilter,expandedFunction,functionLabels,owners,unitOptions,filteredFunctions,evidenceFor,findingsFor,toggleFunction,resetFilters,conclusionHtml,printConclusion,
+          findingTypes,severityLabels,rejectedFindings,functionById,openFunction};
       }
     }).mount('#app');
   </script>
