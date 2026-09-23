@@ -191,6 +191,26 @@
     .function-links{margin-top:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}
     .function-link{padding:5px 8px;color:var(--accent);font-size:12px;text-align:left}
     .no-link{color:var(--muted)}
+    .finding-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:7px}
+    .summary-card{text-align:left;padding:11px 14px;display:grid;gap:6px;align-content:start}
+    .summary-card[aria-pressed=true],.filter-chip[aria-pressed=true],.all-toggle[aria-pressed=true]{border-color:var(--accent);background:var(--tint);color:var(--accent)}
+    .summary-title{display:flex;align-items:baseline;justify-content:space-between;font-weight:600}.summary-title b{font-size:23px;line-height:1.15}
+    .summary-severity{display:flex;gap:8px;flex-wrap:wrap;font-size:11px}.summary-meta,.summary-note{color:var(--muted);font-size:11px}.summary-note{margin-bottom:14px}
+    .status-filters{display:flex;gap:6px;flex-wrap:wrap;width:100%;border-top:1px solid var(--line);padding-top:10px}
+    .filter-chip,.all-toggle{font-size:12px;padding:5px 8px}.filter-chip .count{margin-left:5px}.mode-label{font-size:12px;font-weight:600;padding-bottom:6px}
+    .active-finding{font-size:12px;color:var(--accent);padding:5px 8px;border-color:#c3d0ed;background:var(--tint)}
+    .conclusion-layout.has-toc{display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px;align-items:start}.conclusion-layout .report-paper{width:100%;min-width:0}
+    .conclusion-toc{position:sticky;top:16px;border:1px solid var(--line);border-radius:5px;background:var(--paper);padding:15px 10px}
+    .conclusion-toc h3{font-size:12px;padding:0 8px 8px}.conclusion-toc ol{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+    .conclusion-toc a{display:block;font-size:12px;line-height:1.5;padding:5px 8px;text-decoration:none;border-left:2px solid transparent;overflow-wrap:anywhere}.conclusion-toc a:hover{background:var(--tint)}
+    .conclusion-toc a[aria-current=location]{background:var(--tint);border-color:var(--accent)}.markdown [id]{scroll-margin-top:20px}
+    .source-drawer{position:fixed;inset:0 0 0 auto;margin:0;width:min(510px,100vw);height:100%;max-height:none;max-width:100vw;padding:0;border:0;border-left:1px solid var(--line);background:var(--paper);color:var(--text);box-shadow:-12px 0 40px #17233a18}
+    .source-drawer::backdrop{background:#1b243859}.source-inner{min-height:100%;padding:24px;overflow-wrap:anywhere}.source-heading{display:flex;gap:16px;justify-content:space-between;align-items:start;margin-bottom:20px}
+    .source-heading h2{font-size:20px}.source-close{font-size:20px;line-height:1;padding:7px 10px}.source-meta{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;margin:0 0 20px;font-size:13px}.source-meta dt{color:var(--muted)}.source-meta dd{margin:0}
+    .source-text{white-space:pre-wrap;font-size:14px;line-height:1.8;border:1px solid var(--line);border-radius:4px;padding:16px;margin-top:9px}.source-drawer mark{background:#dfe8ff;color:#1d397a;padding:1px 2px}
+    .source-status{font-size:12px;color:var(--muted);margin:12px 0}.source-context{margin-top:24px}.source-context article{border-top:1px solid var(--line);padding:12px 0}.source-context p{white-space:pre-wrap;font-size:13px;margin-top:6px}
+    @media(max-width:800px){.finding-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.conclusion-layout.has-toc{display:block}.conclusion-toc{position:static;margin-bottom:16px}.source-inner{padding:20px}}
+    @media print{.conclusion-toc,.source-drawer{display:none!important}.source-drawer::backdrop{display:none}.conclusion-layout.has-toc{display:block}body:has(.source-drawer[open]){overflow:visible!important}}
     @media print{.markdown h1,.markdown h2,.markdown h3{page-break-after:avoid}
     .markdown h2+ul,.markdown h2+ol,.markdown h2+ul>li:first-child,.markdown h2+ol>li:first-child{break-before:avoid;page-break-before:avoid}}
     @media(prefers-reduced-motion:reduce){.spinner{animation:none}}
@@ -285,7 +305,7 @@
                   <p v-if="unit.comment" class="unit-comment">{{ unit.comment }}</p>
                 </div>
                 <div class="evidence-list">
-                  <evidence-chip v-for="(ev,i) in unit.evidence" :key="i" :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)">
+                  <evidence-chip v-for="(ev,i) in unit.evidence" :key="i" :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev,$event)">
                   </evidence-chip>
                   <span v-if="!unit.evidence?.length" class="muted">Ссылки не указаны</span>
                 </div>
@@ -302,19 +322,29 @@
             </div>
             <span class="section-meta">{{ result.functions.length }} функций</span>
           </div>
+          <div class="finding-summary" aria-label="Находки по типам, весь результат">
+            <button v-for="card in findingCards" :key="card.type" class="summary-card" :aria-pressed="findingFilter===card.type" @click="toggleFinding(card.type)">
+              <span class="summary-title">{{ card.label }}<b>{{ card.findings.length }}</b></span>
+              <span class="summary-severity"><span v-for="severity in card.severities" :key="severity.id">{{ severity.label }}: <b>{{ severity.count }}</b></span><span v-if="!card.findings.length" class="muted">Нет находок</span></span>
+              <span class="summary-meta">Подтверждено {{ card.verified }} · Отклонено {{ card.findings.length-card.verified }}<br>Связано функций: {{ card.functionIds.size }}</span>
+            </button>
+          </div>
+          <p class="summary-note">Сводка по всему результату. Потери — функции, не найденные в комплекте «после». Конфликты — кандидаты на проверку сотрудником.</p>
           <div class="filters">
-            <label class="filter">Статус<select v-model="statusFilter">
-                <option value="">Все статусы</option>
-                <option v-for="(label,status) in functionLabels" :value="status" :key="status">{{ label }}</option>
-              </select>
-            </label>
+            <span class="mode-label">{{ statusFilter==='changes' ? 'Только изменения' : statusFilter==='all' ? 'Все статусы' : functionLabels[statusFilter] }}</span>
+            <button class="all-toggle" :aria-pressed="statusFilter==='all'" @click="statusFilter=statusFilter==='all' ? 'changes' : 'all'">Показать все</button>
             <label class="filter">Подразделение<select v-model="unitFilter">
                 <option value="">Все подразделения</option>
                 <option v-for="unit in unitOptions" :key="unit.label" :value="unit.label">{{ unit.label }}</option>
               </select>
             </label>
-            <button v-if="statusFilter || unitFilter" class="text-button" @click="resetFilters">Сбросить фильтры</button>
+            <button v-if="activeFindingCard" class="active-finding" @click="findingFilter=''" :aria-label="'Снять фильтр: '+activeFindingCard.label">{{ activeFindingCard.label }} ×</button>
+            <button v-if="statusFilter!=='changes' || unitFilter || findingFilter" class="text-button" @click="resetFilters">Сбросить фильтры</button>
             <span class="filter-count" role="status">Показано {{ filteredFunctions.length }} из {{ result.functions.length }}</span>
+            <div class="status-filters" role="group" aria-label="Фильтр по статусу; счётчики по всему результату">
+              <button class="filter-chip" :aria-pressed="statusFilter==='changes'" @click="statusFilter='changes'">Только изменения<span class="count">{{ changedCount }}</span></button>
+              <button v-for="(label,status) in functionLabels" :key="status" class="filter-chip" :aria-pressed="statusFilter===status" @click="statusFilter=statusFilter===status ? 'changes' : status">{{ label }}<span class="count">{{ statusCounts[status] }}</span></button>
+            </div>
           </div>
           <div class="table-wrap">
             <table class="functions-table">
@@ -372,7 +402,7 @@
                             <h3>{{ side.id==='before' ? 'Ред. до' : 'Ред. после' }}</h3>
                             <div v-for="(ev,index) in evidenceFor(fn,side.id)" :key="index" class="quote-block">
                               <div class="quote-meta">
-                                <evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)">
+                                <evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev,$event)">
                                 </evidence-chip>
                                 <span v-if="ev.page != null" class="page-number">Стр. {{ ev.page }}</span>
                               </div>
@@ -415,8 +445,10 @@
             <button class="primary-button" :disabled="!result.conclusion_md.trim()" @click="printConclusion" title="Открыть печатную версию и сохранить в PDF">Скачать <span aria-hidden="true">↓</span>
             </button>
           </div>
-          <article v-if="result.conclusion_md.trim()" class="report-paper markdown" v-html="conclusionHtml">
-          </article>
+          <div v-if="result.conclusion_md.trim()" class="conclusion-layout" :class="{'has-toc':conclusionDocument.headings.length}">
+            <nav v-if="conclusionDocument.headings.length" class="conclusion-toc" aria-label="Оглавление заключения"><h3>Оглавление</h3><ol><li v-for="heading in conclusionDocument.headings" :key="heading.id" :style="{paddingLeft:Math.min(heading.level-1,3)*10+'px'}"><a :href="'#'+heading.id" :aria-current="currentHeading===heading.id ? 'location' : undefined" @click.prevent="goToHeading(heading.id)">{{ heading.label }}</a></li></ol></nav>
+            <article class="report-paper markdown" v-html="conclusionHtml"></article>
+          </div>
           <div v-else class="empty">Заключение ещё не сформировано.</div>
         </section>
         <section v-show="activeTab==='rejected'" id="panel-rejected" role="tabpanel" aria-labelledby="tab-rejected" tabindex="0">
@@ -442,7 +474,7 @@
                 <h3>Цитаты отклонённого вывода</h3>
                 <div v-for="(ev,index) in finding.evidence" :key="index">
                   <div class="quote-meta">
-                    <evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)">
+                    <evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev,$event)">
                     </evidence-chip>
                     <span v-if="ev.page != null" class="page-number">Стр. {{ ev.page }}</span>
                   </div>
@@ -468,9 +500,23 @@
         </footer>
       </template>
     </main>
+    <dialog ref="sourceDialog" class="source-drawer" aria-labelledby="source-title" @cancel.prevent="closeSource" @close="closeSource" @click.self="closeSource">
+      <div v-if="source" class="source-inner">
+        <header class="source-heading"><div><p class="eyebrow">Основание вывода</p><h2 id="source-title">Источник · <code>§ {{ source.clause_id }}</code></h2></div><button class="source-close" aria-label="Закрыть источник" @click="closeSource" autofocus>×</button></header>
+        <dl class="source-meta"><dt>Документ</dt><dd>{{ sourceDocument?.name || source.doc_id }}</dd><dt>Идентификатор</dt><dd><code>{{ source.doc_id }}</code></dd><dt>Пункт</dt><dd><code>{{ source.clause_id }}</code></dd><dt>Страница</dt><dd>{{ source.page == null ? 'Не указана в источнике' : source.page }}</dd></dl>
+        <p v-if="sourceBusy" class="source-status" role="status">Загружаем полный текст пункта…</p>
+        <p v-if="sourceError" class="notice" role="status">Полный текст пункта недоступен. Показана цитата из результата.</p>
+        <h3>{{ source.full ? 'Текст пункта' : 'Цитата из результата' }}</h3>
+        <div class="source-text" v-html="sourceHighlight.html"></div>
+        <template v-if="source.full && !sourceHighlight.matched"><p class="source-status">В полном тексте не найдено точное совпадение. Цитата из результата:</p><div class="source-text"><mark>{{ source.quote }}</mark></div></template>
+        <p v-if="!source.full && !sourceBusy && !sourceError" class="source-status">Показан фрагмент, использованный в анализе.</p>
+        <section v-if="source.neighbors.length" class="source-context"><h3>Контекст</h3><article v-for="(neighbor,index) in source.neighbors" :key="index"><code v-if="neighbor.clause_id">§ {{ neighbor.clause_id }}</code><span v-if="neighbor.page != null" class="page-number"> · Стр. {{ neighbor.page }}</span><p>{{ neighbor.text }}</p></article></section>
+      </div>
+    </dialog>
   </div>
   <script>
     const { createApp, ref, computed, onMounted, nextTick } = Vue;
+    const USE_CLAUSE_API = false; // Enable GET /api/clause when the backend is ready; Evidence remains the fallback.
     const evidenceKey = ev => JSON.stringify([ev.doc_id, ev.clause_id, ev.quote]);
     // Escape all source HTML before adding the small supported Markdown vocabulary.
     const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -481,7 +527,12 @@
           .replace(/(^|\s)\*([^*]+)\*(?=\s|[.,;!?]|$)/g,'$1<em>$2</em>').replace(/(^|\s)_([^_]+)_(?=\s|[.,;!?]|$)/g,'$1<em>$2</em>');
       }).join('');
     }
-    function renderMarkdown(source) {
+    function highlightQuote(text,quote) {
+      const pattern=quote.trim().split(/\s+/).map(word => word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\s+');
+      const match=pattern ? new RegExp(pattern,'u').exec(text) : null;
+      return {matched:!!match,html:match ? escapeHtml(text.slice(0,match.index))+'<mark>'+escapeHtml(match[0])+'</mark>'+escapeHtml(text.slice(match.index+match[0].length)) : escapeHtml(text)};
+    }
+    function renderMarkdown(source,headings=[]) {
       const lines=String(source || '').replace(/\r\n?/g,'\n').split('\n'), output=[];
       const listItem=line => /^(\s*)([-+*]|\d+\.)\s+(.*)$/.exec(line || '');
       const cells=line => line.trim().replace(/^\|/,'').replace(/\|$/,'').split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g,'|'));
@@ -504,7 +555,11 @@
       while(i<lines.length) {
         if(!lines[i].trim()) { i++; continue; }
         const heading=/^(#{1,6})\s+(.+)$/.exec(lines[i]);
-        if(heading) { const level=heading[1].length; output.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`); i++; continue; }
+        if(heading) {
+          const level=heading[1].length,id='conclusion-section-'+(headings.length+1),label=heading[2].replace(/\s+#+\s*$/,'');
+          headings.push({id,level,label:label.replace(/[*_`]/g,'')});
+          output.push(`<h${level} id="${id}" tabindex="-1">${inlineMarkdown(label)}</h${level}>`); i++; continue;
+        }
         if(tableAt(i)) {
           const headers=cells(lines[i]), rows=[]; i+=2;
           while(i<lines.length && lines[i].trim() && lines[i].includes('|')) rows.push(cells(lines[i++]));
@@ -520,21 +575,31 @@
     }
     const EvidenceChip = {
       props: ['evidence', 'selected'], emits: ['select'],
-      template: `<button type="button" class="evidence-chip" :aria-pressed="selected" :title="evidence.quote + (evidence.page == null ? '' : ' · Стр. ' + evidence.page)" @click.stop="$emit('select')">{{ evidence.doc_id }} <b>§ {{ evidence.clause_id }}</b></button>`
+      template: `<button type="button" class="evidence-chip" aria-haspopup="dialog" :aria-pressed="selected" :title="evidence.quote + (evidence.page == null ? '' : ' · Стр. ' + evidence.page)" @click.stop="$emit('select',$event.currentTarget)">{{ evidence.doc_id }} <b>§ {{ evidence.clause_id }}</b></button>`
     };
     createApp({
       components: { EvidenceChip },
       setup() {
         const result = ref(null), loading = ref(true), error = ref(''), activeTab = ref('structure'), selectedEvidence = ref(null);
         const localDemo = new URLSearchParams(location.search).get('demo') !== '1';
-        const statusFilter=ref(''), unitFilter=ref(''), expandedFunction=ref(null);
+        const statusFilter=ref('changes'), unitFilter=ref(''), expandedFunction=ref(null), findingFilter=ref(''), currentHeading=ref('');
         const functionLabels={preserved:'Сохранена',transferred:'Передана',changed:'Изменена',lost:'Не найдена в комплекте «после»',duplicated:'Дублируется'};
         const findingTypes={loss:'Не найдена в комплекте «после»',transfer:'Перенос',duplication:'Дублирование',conflict:'Конфликт интересов',structure:'Структура'};
         const severityLabels={high:'высокая',medium:'средняя',low:'низкая'};
+        const statusCounts=computed(() => Object.fromEntries(Object.keys(functionLabels).map(status => [status,(result.value?.functions || []).filter(fn => fn.status===status).length])));
+        const changedCount=computed(() => (result.value?.functions.length || 0)-statusCounts.value.preserved);
+        const findingCards=computed(() => Object.entries({loss:'Потери',transfer:'Переносы',duplication:'Дубли',conflict:'Конфликты'}).map(([type,label]) => {
+          const findings=(result.value?.findings || []).filter(finding => finding.type===type);
+          const functionIds=new Set(findings.flatMap(finding => finding.function_ids || []).filter(id => result.value.functions.some(fn => fn.id===id)));
+          return {type,label,findings,functionIds,verified:findings.filter(f => f.verified===true).length,
+            severities:Object.entries(severityLabels).map(([id,label]) => ({id,label,count:findings.filter(f => f.severity===id).length})).filter(s => s.count)};
+        }));
+        const activeFindingCard=computed(() => findingCards.value.find(card => card.type===findingFilter.value));
+        function toggleFinding(type) { findingFilter.value=findingFilter.value===type ? '' : type; expandedFunction.value=null; }
         const rejectedFindings=computed(() => (result.value?.findings || []).filter(finding => finding.verified!==true));
         const functionById=id => result.value.functions.find(fn => fn.id===id);
         async function openFunction(id) {
-          resetFilters(); activeTab.value='functions'; expandedFunction.value=id;
+          resetFilters(); statusFilter.value='all'; activeTab.value='functions'; expandedFunction.value=id;
           await nextTick();
           const button=document.getElementById('function-'+id);
           button?.scrollIntoView({block:'center'}); button?.focus({preventScroll:true});
@@ -555,12 +620,13 @@
         });
         const filteredFunctions=computed(() => {
           const unit=unitOptions.value.find(u => u.label===unitFilter.value);
-          return (result.value?.functions || []).filter(fn => (!statusFilter.value || fn.status===statusFilter.value) && (!unit || [fn.owner_before,fn.owner_after].filter(Boolean).some(owner => matchesUnit(owner,unit))));
+          return (result.value?.functions || []).filter(fn => (statusFilter.value==='all' || (statusFilter.value==='changes' ? fn.status!=='preserved' : fn.status===statusFilter.value))
+            && (!activeFindingCard.value || activeFindingCard.value.functionIds.has(fn.id)) && (!unit || [fn.owner_before,fn.owner_after].filter(Boolean).some(owner => matchesUnit(owner,unit))));
         });
         const evidenceFor=(fn,side) => (fn.evidence || []).filter(ev => result.value.documents.find(doc => doc.doc_id===ev.doc_id)?.side===side);
         const findingsFor=id => result.value.findings.filter(finding => (finding.function_ids || []).includes(id));
         function toggleFunction(id) { expandedFunction.value=expandedFunction.value===id ? null : id; }
-        function resetFilters() { statusFilter.value=''; unitFilter.value=''; }
+        function resetFilters() { statusFilter.value='changes'; unitFilter.value=''; findingFilter.value=''; }
         const sides = [{id:'before',label:'До реорганизации'},{id:'after',label:'После'}];
         const unitLabels = {created:'Созданы',preserved:'Сохранены',transformed:'Преобразованы',eliminated:'Упразднены'};
         const tabs = computed(() => [
@@ -571,9 +637,38 @@
         ]);
         const unitGroups = computed(() => Object.entries(unitLabels).map(([id,label]) => ({id,label,units:result.value?.units.filter(u => u.status===id) || []})));
         const documentsFor = side => result.value.documents.filter(doc => doc.side===side);
-        const conclusionHtml=computed(() => renderMarkdown(result.value?.conclusion_md));
+        const conclusionDocument=computed(() => { const headings=[]; return {html:renderMarkdown(result.value?.conclusion_md,headings),headings}; });
+        const conclusionHtml=computed(() => conclusionDocument.value.html);
+        function goToHeading(id) { currentHeading.value=id; const heading=document.getElementById(id); heading?.scrollIntoView({block:'start'}); heading?.focus({preventScroll:true}); }
         const printConclusion=() => window.print();
-        function selectEvidence(ev) { const key=evidenceKey(ev); selectedEvidence.value=selectedEvidence.value===key ? null : key; }
+        const source=ref(null), sourceDialog=ref(null), sourceBusy=ref(false), sourceError=ref(false);
+        const sourceDocument=computed(() => result.value?.documents.find(doc => doc.doc_id===source.value?.doc_id));
+        const sourceHighlight=computed(() => source.value ? highlightQuote(source.value.text,source.value.quote) : {html:'',matched:false});
+        let sourceRequest=null, sourceVersion=0, sourceOpener=null, previousOverflow='';
+        async function selectEvidence(ev,opener) {
+          const version=++sourceVersion; sourceRequest?.abort(); sourceOpener=opener || document.activeElement;
+          selectedEvidence.value=evidenceKey(ev); source.value={...ev,text:ev.quote,neighbors:[],full:false}; sourceBusy.value=USE_CLAUSE_API; sourceError.value=false;
+          await nextTick();
+          if(version!==sourceVersion) return;
+          if(!sourceDialog.value.open) { previousOverflow=document.body.style.overflow; document.body.style.overflow='hidden'; sourceDialog.value.showModal(); }
+          if(!USE_CLAUSE_API) return;
+          const controller=new AbortController(); sourceRequest=controller;
+          const timeout=setTimeout(() => controller.abort(),8000);
+          try {
+            const response=await fetch(`/api/clause/${encodeURIComponent(ev.doc_id)}/${encodeURIComponent(ev.clause_id)}`,{signal:controller.signal});
+            if(!response.ok) throw new Error('HTTP '+response.status);
+            const clause=await response.json();
+            if(typeof clause.text!=='string' || !clause.text.trim()) throw new Error('Нет текста пункта');
+            if(version===sourceVersion) source.value={...ev,text:clause.text,page:clause.page===undefined ? ev.page : clause.page,full:true,
+              neighbors:(Array.isArray(clause.neighbors) ? clause.neighbors : []).map(n => typeof n==='string' ? {text:n} : n).filter(n => n && typeof n.text==='string')};
+          } catch (_) { if(version===sourceVersion) sourceError.value=true; }
+          finally { clearTimeout(timeout); if(version===sourceVersion) sourceBusy.value=false; }
+        }
+        function closeSource() {
+          if(!source.value) return;
+          sourceVersion++; sourceRequest?.abort(); sourceDialog.value?.close(); source.value=null; selectedEvidence.value=null; sourceBusy.value=false;
+          document.body.style.overflow=previousOverflow; sourceOpener?.focus({preventScroll:true});
+        }
         function tabKey(event,index) {
           const key=event.key, count=tabs.value.length;
           const target=key==='ArrowRight' ? (index+1)%count : key==='ArrowLeft' ? (index+count-1)%count : key==='Home' ? 0 : key==='End' ? count-1 : -1;
@@ -595,7 +690,8 @@
         onMounted(loadResult);
         return {result,loading,error,activeTab,selectedEvidence,localDemo,sides,tabs,unitGroups,documentsFor,evidenceKey,selectEvidence,tabKey,loadResult,
           statusFilter,unitFilter,expandedFunction,functionLabels,owners,unitOptions,filteredFunctions,evidenceFor,findingsFor,toggleFunction,resetFilters,conclusionHtml,printConclusion,
-          findingTypes,severityLabels,rejectedFindings,functionById,openFunction};
+          findingTypes,severityLabels,rejectedFindings,functionById,openFunction,statusCounts,changedCount,findingCards,findingFilter,activeFindingCard,toggleFinding,
+          conclusionDocument,currentHeading,goToHeading,source,sourceDialog,sourceBusy,sourceError,sourceDocument,sourceHighlight,closeSource};
       }
     }).mount('#app');
   </script>
