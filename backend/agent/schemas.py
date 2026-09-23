@@ -11,7 +11,8 @@ from pydantic import BaseModel, Field
 Side = Literal["before", "after"]
 UnitStatus = Literal["created", "preserved", "transformed", "eliminated"]
 FunctionStatus = Literal["preserved", "transferred", "changed", "lost", "duplicated"]
-FindingType = Literal["loss", "change", "transfer", "duplication", "conflict", "structure"]
+FindingType = Literal["loss", "change", "transfer", "duplication", "conflict", "overlap", "structure"]
+Confidence = Literal["high", "medium", "low"]
 Severity = Literal["high", "medium", "low"]
 
 
@@ -139,6 +140,8 @@ class Finding(BaseModel):
     summary: str
     evidence: list[Evidence] = Field(min_length=1)
     function_ids: list[str] = []
+    confidence: Confidence | None = Field(None, description="conflict: high = performs + controls + staff/subordination "
+                                                            "confirmed, medium = two of three; overlap is always low")
     recommendation: str | None = None
     verified: bool = False
     rejection_reason: str | None = None
@@ -148,6 +151,8 @@ class Stats(BaseModel):
     findings_total: int = 0
     verified: int = 0
     rejected: int = 0
+    citations_corrected: int = Field(0, description="Extractor citations re-pointed to the clause that contains the quote")
+    functions_dropped: int = Field(0, description="Extracted functions dropped before verification: quote not found")
     duration_s: float | None = None
     cost_usd: float | None = Field(None, description="Sum of LLM costs; null if a model price is unknown")
 

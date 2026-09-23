@@ -95,11 +95,17 @@ def check(result: AnalysisResult) -> list[Row]:
     conf = [f for f in result.findings if f.verified and f.type == "conflict" and "ДККМ" in f.summary
             and any(_side(result, e.doc_id) == BEFORE for e in f.evidence)]
     resolved = [f for f in conf if "устранён" in f.summary]
+    downgraded = [f for f in result.findings if f.verified and f.type == "overlap" and "ДККМ" in f.summary
+                  and any(_side(result, e.doc_id) == BEFORE for e in f.evidence)]
     rows.append(Row("конфликт ДККМ в red8, устранён в red9", "conflict (resolved)",
-                    "найдено" if resolved else ("частично" if conf else "пропущено"), ", ".join(f.id for f in conf)))
-    dual = [f for f in result.findings if f.verified and _cites(f, result, BEFORE, "3.6")]
-    rows.append(Row("red8 3.6 двойное подчинение", "conflict/structure", "найдено" if dual else "пропущено",
-                    ", ".join(f.id for f in dual), required=False))
+                    "найдено" if resolved else ("ложное" if downgraded else ("частично" if conf else "пропущено")),
+                    ", ".join(f"{f.id} {f.confidence}" for f in conf + downgraded)))
+    dual = [f for f in result.findings if f.verified and _cites(f, result, BEFORE, "3.6")
+            and f.type in ("conflict", "overlap")]
+    conflict = [f for f in dual if f.type == "conflict"]
+    rows.append(Row("red8 3.6 двойное подчинение", "conflict (не overlap)",
+                    "найдено" if conflict else ("ложное" if dual else "пропущено"),
+                    ", ".join(f"{f.id} {f.type}/{f.confidence}" for f in dual)))
     zdo = [f for f in result.findings if f.verified and _cites(f, result, AFTER, "4.4")]
     rows.append(Row("red9 4.4 раскрытие КИ Главного аудитора в ДЗО", "conflict/change",
                     "найдено" if zdo else "пропущено", ", ".join(f.id for f in zdo), required=False))
@@ -124,6 +130,9 @@ def table(result: AnalysisResult) -> str:
     if extra:
         lines.append("\nПотери вне Validation set (проверить вручную):")
         lines += [f"- {f.id}: {f.summary}" for f in extra]
+    lines.append("\nКонфликты и пересечения:")
+    lines += [f"- {f.id} {f.type}/{f.confidence}: {f.summary[:220]}" for f in result.findings
+              if f.type in ("conflict", "overlap")]
     return "\n".join(lines)
 
 

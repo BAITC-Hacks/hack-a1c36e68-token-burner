@@ -106,6 +106,7 @@
             "transfer",
             "duplication",
             "conflict",
+            "overlap",
             "structure"
           ],
           "title": "Type",
@@ -139,6 +140,24 @@
           },
           "title": "Function Ids",
           "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "conflict: high = performs + controls + staff/subordination confirmed, medium = two of three; overlap is always low",
+          "title": "Confidence"
         },
         "recommendation": {
           "anyOf": [
@@ -296,6 +315,18 @@
         "rejected": {
           "default": 0,
           "title": "Rejected",
+          "type": "integer"
+        },
+        "citations_corrected": {
+          "default": 0,
+          "description": "Extractor citations re-pointed to the clause that contains the quote",
+          "title": "Citations Corrected",
+          "type": "integer"
+        },
+        "functions_dropped": {
+          "default": 0,
+          "description": "Extracted functions dropped before verification: quote not found",
+          "title": "Functions Dropped",
           "type": "integer"
         },
         "duration_s": {
@@ -539,6 +570,8 @@
         "findings_total": 0,
         "verified": 0,
         "rejected": 0,
+        "citations_corrected": 0,
+        "functions_dropped": 0,
         "duration_s": null,
         "cost_usd": null
       }

@@ -16,10 +16,11 @@ def result():
 
 def test_template_uses_only_verified_findings_and_lists_rejected_separately():
     md = render_conclusion(result(), "Абзац.")
-    body, rejected = md.split("## Отклонено верификатором")
+    body, rejected = md.split("## Отклонено верификатором (в выводах не учитывается)")
     assert "**F1**" in body and "«red8.pdf», п. 5.6.2, с. 10" in body and "Рекомендация: Закрепить право." in body
     assert "F2" not in body and "## Дублирование" not in body
     assert "F2: ложный дубль — причина: цитата не совпадает" in rejected
+    assert "## " not in rejected  # the rejected block is the last one
 
 
 def test_incomplete_analysis_is_stated():

@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from backend.agent.pipeline import run
+from backend.agent.pipeline import UnreadableInput, run
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,7 +24,11 @@ def main(argv: list[str] | None = None) -> int:
     def progress(step: str, fraction: float, message: str) -> None:
         print(f"[{time.monotonic() - started:6.1f}s {fraction:4.0%}] {step}: {message}", file=sys.stderr)
 
-    result = run(args.before, args.after, progress=progress, use_cache=not args.no_cache)
+    try:
+        result = run(args.before, args.after, progress=progress, use_cache=not args.no_cache)
+    except UnreadableInput as exc:
+        print(f"Ошибка: {exc}", file=sys.stderr)
+        return 1
     Path(args.output).write_text(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
                                  encoding="utf-8")
     for step in result.trace:

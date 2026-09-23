@@ -38,9 +38,30 @@ def test_pipeline_end_to_end(tmp_path):
     assert result.stats.duration_s is not None
 
 
-def test_pipeline_needs_both_sets(tmp_path):
+def test_unreadable_file_fails_the_job_and_names_the_file(tmp_path):
     before = write(tmp_path / "before.txt", BASE)
     broken = tmp_path / "after.pdf"
     broken.write_bytes(b"not a pdf")
-    result = pipeline.run([before], [broken], client=FakeClient(), use_cache=False)
-    assert not result.analysis_complete and result.warnings
+    with pytest.raises(pipeline.UnreadableInput, match="«after.pdf»"):
+        pipeline.run([before], [broken], client=FakeClient(), use_cache=False)
+
+
+def test_stats_count_corrected_and_dropped_citations(tmp_path, monkeypatch):
+    from backend.agent import extract
+
+    real_clean = extract.clean
+
+    def noisy_clean(doc, extraction):
+        fns = extraction.functions
+        if fns:  # one citation points at the wrong clause, one quote is invented
+            fns = [fns[0].model_copy(update={"clause_id": "1.1"})] + fns[1:]
+            fns.append(fns[-1].model_copy(update={"quote": "утверждает бюджет департамента закупок"}))
+        return real_clean(doc, extraction.model_copy(update={"functions": fns}))
+
+    monkeypatch.setattr(extract, "clean", noisy_clean)
+    before = write(tmp_path / "before.txt", BASE)
+    after = write(tmp_path / "after.txt", BASE)
+    docs = [make_doc("before-1", "before", BASE), make_doc("after-1", "after", BASE)]
+    docs[0].name, docs[1].name = "before.txt", "after.txt"
+    result = pipeline.run([before], [after], client=FakeClient(docs), use_cache=False)
+    assert result.stats.citations_corrected >= 2 and result.stats.functions_dropped >= 2

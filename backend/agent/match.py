@@ -73,6 +73,8 @@ class Conflict(BaseModel):
     subject: str
     performs_ids: list[str]
     controls_ids: list[str]
+    performer_roles: list[str] = []
+    shared_staff: list[str] = []
     refs: list[Ref]
     resolved_in_after: bool | None
     comment: str
@@ -154,15 +156,23 @@ def _fn_line(f: FnRef) -> str:
     return f"{f.id} {_cid(f.doc_id, f.clause_id)} {f.action} → {f.object} | область: {f.area}"
 
 
+def _structure_ids(doc: Document, ex: Extraction | None) -> set[str]:
+    """Clauses about units and positions: those cited by the extracted structure, their parents and list items."""
+    if not ex:
+        return set()
+    ids = {c for x in ex.units + ex.roles for c in x.clause_ids}
+    ids |= {doc.clause(c).parent_id for c in list(ids) if doc.clause(c) and doc.clause(c).parent_id}
+    ids |= {c.clause_id for c in doc.clauses if c.parent_id in ids}
+    return ids
+
+
 def _structure_clauses(docs: list[Document], extractions: dict[str, Extraction]) -> list[str]:
     lines = []
     for doc in docs:
         ex = extractions.get(doc.doc_id)
         if not ex:
             continue
-        ids = {c for x in ex.units + ex.roles for c in x.clause_ids}
-        ids |= {doc.clause(c).parent_id for c in list(ids) if doc.clause(c) and doc.clause(c).parent_id}
-        ids |= {c.clause_id for c in doc.clauses if c.parent_id in ids}  # the listed items of a structure clause
+        ids = _structure_ids(doc, ex)
         side = "до" if doc.side == "before" else "после"
         lines += [f"{_cid(doc.doc_id, c.clause_id)} ({side}) {c.text}" for c in doc.clauses if c.clause_id in ids]
     return lines
@@ -352,6 +362,141 @@ def empty_clause_findings(docs: list[Document]) -> list[Finding]:
     return out
 
 
+# --- conflicts ---
+
+
+class GradedConflict(BaseModel):
+    confidence: Literal["high", "medium", "low"]
+    finding: dict
+    functions: list[FnRef]
+
+
+CONTROL_STEMS = ("контр", "надзо", "оцен", "монит", "качес", "ревиз")
+GENERIC_STEMS = {"обще", "общес", "работ", "деяте", "внутр", "проце", "функц", "вопро", "докум", "получ",
+                 "рамка", "рамки", "целях", "части", "соотв", "работн"}
+
+
+def _stem_set(text: str) -> set[str]:
+    return {w[:5] for w in normalize(text).split() if len(w) >= 4} - GENERIC_STEMS
+
+
+def _is_control(f: FnRef) -> bool:
+    return any(stem in normalize(f"{f.action} {f.object}") for stem in CONTROL_STEMS)
+
+
+GENERIC_SHARE = 0.10  # a word found in more than 10% of a side's functions says nothing about the activity
+
+
+GENERIC_CLAUSE_SHARE = 0.05  # ... or in more than 5% of its clauses («осуществлять», «Положение»)
+GENERIC_MIN_COUNT = 3  # small documents: a word seen once or twice is never "generic"
+
+
+def _frequent_stems(fns: list[FnRef], docs: list[Document]) -> set[str]:
+    counts = Counter(stem for f in fns for stem in _stem_set(f"{f.object} {f.area}"))
+    generic = {stem for stem, n in counts.items() if n >= GENERIC_MIN_COUNT and n > GENERIC_SHARE * len(fns)}
+    clauses = [c.text for d in docs for c in d.clauses]
+    in_clauses = Counter(stem for text in clauses for stem in _stem_set(text))
+    return generic | {stem for stem, n in in_clauses.items()
+                      if n >= GENERIC_MIN_COUNT and n > GENERIC_CLAUSE_SHARE * len(clauses)}
+
+
+def _same_activity(performs: list[FnRef], controls: list[FnRef], generic: set[str]) -> tuple[list[FnRef], list[FnRef]]:
+    """Keep performs/controls pairs about the same activity: shared distinctive words in object or area."""
+    pairs = [(p, c) for p in performs for c in controls
+             if (_stem_set(f"{p.object} {p.area}") & _stem_set(f"{c.object} {c.area}")) - generic]
+    return list({p.id: p for p, _ in pairs}.values()), list({c.id: c for _, c in pairs}.values())
+
+
+def _examples(fns: list[FnRef], n: int = 2) -> str:
+    return "; ".join(f"«{f.action} {f.object}» (п. {f.clause_id})" for f in fns[:n])
+
+
+def grade_conflicts(conflicts: list[Conflict], docs: list[Document], extractions: dict[str, Extraction],
+                    pm: Prematch) -> list[GradedConflict]:
+    """Three checkable conditions, each backed by a citation:
+    1. the subject itself performs the activity (a non-control function owned by the subject);
+    2. the subject itself controls the same activity (a control/supervision/quality function owned by the
+       subject that shares significant object/area words with a performed one);
+    3. staff or subordination confirms it (a verified quote from an org-structure clause naming a position
+       other than the subject).
+    3 of 3 -> conflict/high, 2 -> conflict/medium, 1 -> overlap (low), 0 -> dropped.
+    A subject that is not a unit or position of the org structure is at most an overlap.
+    One result per (side, subject): the best-supported candidate wins."""
+    by_id = {d.doc_id: d for d in docs}
+    norm = OwnerNormalizer(list(extractions.values()))
+    structure = {(d.doc_id, c) for d in docs for c in _structure_ids(d, extractions.get(d.doc_id))}
+    in_structure = {side: {norm.key(x.short_name if hasattr(x, "short_name") and x.short_name else x.name)
+                           for d in docs if d.side == side and extractions.get(d.doc_id)
+                           for x in extractions[d.doc_id].units + extractions[d.doc_id].roles}
+                    for side in ("before", "after")}
+    generic = {side: _frequent_stems(pm.before if side == "before" else pm.after,
+                                     [d for d in docs if d.side == side]) for side in ("before", "after")}
+    best: dict[tuple[str, str], tuple[int, GradedConflict]] = {}
+    for c in conflicts:
+        subject = norm.key(c.subject)
+
+        def own(ids: list[str]) -> list[FnRef]:
+            fns = (pm.fn(i) for i in dict.fromkeys(ids))
+            return [f for f in fns if f and f.side == c.side and same_owner(f.owner_key, subject)]
+
+        controls = [f for f in own(c.controls_ids) if _is_control(f)]
+        performs = [f for f in own(c.performs_ids) if not _is_control(f) and f.id not in {x.id for x in controls}]
+        if performs and controls:
+            performs, controls = _same_activity(performs, controls, generic[c.side])
+        refs = [e for e in (_ev_ref(r) for r in c.refs)
+                if (e.doc_id, e.clause_id) in structure and by_id.get(e.doc_id) and by_id[e.doc_id].side == c.side
+                and check_evidence(e, by_id) is None]
+        staff = [s for s in dict.fromkeys(c.performer_roles + c.shared_staff)
+                 if s.strip() and not same_owner(norm.key(s), subject)]
+        met = [bool(performs), bool(controls), bool(refs and staff)]
+        score = sum(met)
+        if not any(same_owner(subject, k) for k in in_structure[c.side]):
+            score = min(score, 1)  # conflicts are assessed for units and positions of the org structure
+        if score == 0:
+            continue
+        confidence = {3: "high", 2: "medium", 1: "low"}[score]
+        where = "в редакции «до»" if c.side == "before" else "в редакции «после»"
+        parts = []
+        if performs:
+            parts.append(f"выполняет: {_examples(performs)}")
+        if controls:
+            parts.append(f"контролирует: {_examples(controls)}")
+        if refs and staff:
+            parts.append(f"по оргструктуре: {', '.join(staff[:4])}")
+        facts = "; ".join(parts)
+        comment = c.comment.removeprefix(CANDIDATE).lstrip(" :.—")
+        evidence = _dedupe([_ev(f) for f in performs[:2] + controls[:2]] + refs[:2])
+        if confidence == "low":
+            finding = dict(id="", type="overlap", severity="low", confidence="low", evidence=evidence,
+                           summary=f"Пересечение ответственности {where} у «{subject}»: {facts}. {comment} "
+                                   f"Для конфликта интересов подтверждено одно условие из трёх.".strip(),
+                           function_ids=[f.id for f in performs + controls if f.side == "before"])
+        else:
+            resolved = c.side == "before" and c.resolved_in_after
+            tail = " В редакции «после» конфликт устранён реорганизацией." if resolved else ""
+            severity = "low" if resolved else (c.severity if confidence == "high" else
+                                               min(c.severity, "medium", key=lambda s: SEVERITY_RANK[s]))
+            finding = dict(id="", type="conflict", severity=severity, confidence=confidence, evidence=evidence,
+                           summary=f"Конфликт интересов {where} у «{subject}» (уверенность: {confidence}). "
+                                   f"{CANDIDATE}: {facts}. {comment}{tail}",
+                           function_ids=[f.id for f in performs + controls if f.side == "before"])
+        graded = GradedConflict(confidence=confidence, finding=finding, functions=performs + controls)
+        key = (c.side, subject)
+        if key not in best or score > best[key][0]:
+            best[key] = (score, graded)
+    return [g for _, g in best.values()]
+
+
+def _flag_conflict(fns: list[FnRef], functions: dict[str, Function]) -> None:
+    for f in fns:
+        ids = [f.id] if f.side == "before" else [b for b, fn in functions.items()
+                                                  if any(e.clause_id == f.clause_id and e.doc_id == f.doc_id
+                                                         for e in fn.evidence)]
+        for fid in ids:
+            if fid in functions:
+                functions[fid].conflict_of_interest = True
+
+
 # --- units ---
 
 
@@ -477,15 +622,10 @@ def _collect(results) -> tuple[dict[str, Verdict], list[Duplicate], list[Conflic
                 for ch in out.checks:
                     if not ch.is_conflict:
                         continue
-                    details = []
-                    if ch.performer_roles:
-                        details.append("в штате исполнители контролируемой деятельности: " + ", ".join(ch.performer_roles))
-                    if ch.shared_staff:
-                        details.append("двойное подчинение: " + ", ".join(ch.shared_staff))
-                    comment = ch.comment + (f" ({'; '.join(details)})" if details else "")
                     conflicts.append(Conflict(side=ch.side, subject=ch.subject, performs_ids=ch.performs_ids,
-                                              controls_ids=ch.control_ids, refs=ch.refs,
-                                              resolved_in_after=ch.resolved_in_after, comment=comment,
+                                              controls_ids=ch.control_ids, performer_roles=ch.performer_roles,
+                                              shared_staff=ch.shared_staff, refs=ch.refs,
+                                              resolved_in_after=ch.resolved_in_after, comment=ch.comment,
                                               severity=ch.severity))
     return verdicts, dups, conflicts, comps, calls, failed
 
@@ -503,7 +643,8 @@ def match(docs: list[Document], extractions: dict[str, Extraction], pm: Prematch
         rest = [pool.submit(_run_group, g, shared, pm, by_id, client) for g in groups[1:]]
         results = [first.result()] + [f.result() for f in rest]
     verdicts, dups, conflicts, comps, calls, failed = _collect(results)
-    _dump_raw(results)
+    if client is None:  # real runs only; tests inject a fake client
+        _dump_raw(results)
 
     # statuses: prematch (deterministic) + model verdicts
     for p in pm.preserved:
@@ -591,32 +732,15 @@ def match(docs: list[Document], extractions: dict[str, Extraction], pm: Prematch
                                         f"{d.comment}".strip(),
                                 evidence=_dedupe(evidence), function_ids=[fid],
                                 recommendation=d.recommendation))
-    # conflicts (candidates for a human check)
-    seen_conf = set()
-    for c in conflicts:
-        fns = [f for f in (pm.fn(i) for i in dict.fromkeys(c.performs_ids + c.controls_ids)) if f]
-        key = (c.side, normalize(c.subject), frozenset(f.id for f in fns))
-        if key in seen_conf or (not fns and not c.refs):
-            continue
-        seen_conf.add(key)
-        comment = c.comment if c.comment.startswith(CANDIDATE) else f"{CANDIDATE}: {c.comment}"
-        where = "в редакции «до»" if c.side == "before" else "в редакции «после»"
-        tail = " В редакции «после» конфликт устранён реорганизацией." if c.side == "before" and c.resolved_in_after else ""
-        for f in fns:
-            ids = [f.id] if f.side == "before" else [b for b, fn in functions.items()
-                                                      if any(e.clause_id == f.clause_id and e.doc_id == f.doc_id
-                                                             for e in fn.evidence)]
-            for fid in ids:
-                if fid in functions:
-                    functions[fid].conflict_of_interest = True
-        _append(findings, dict(id="", type="conflict", severity="low" if tail else c.severity,
-                                summary=f"Конфликт интересов {where} у «{c.subject}». {comment}{tail}",
-                                evidence=_dedupe([_ev(f) for f in fns[:4]] + [_ev_ref(r) for r in c.refs[:3]]),
-                                function_ids=[f.id for f in fns if f.side == "before"]))
+    # conflicts: the model proposes, the code grades the evidence
+    for grade in grade_conflicts(conflicts, docs, extractions, pm):
+        _append(findings, grade.finding)
+        if grade.confidence in ("high", "medium"):
+            _flag_conflict(grade.functions, functions)
 
     units, structure = unit_diff(docs, extractions, pm, functions, comps)
     findings = structure + empty_clause_findings(docs) + findings
-    order = {"structure": 0, "loss": 1, "change": 2, "transfer": 3, "duplication": 4, "conflict": 5}
+    order = {"structure": 0, "loss": 1, "change": 2, "transfer": 3, "duplication": 4, "conflict": 5, "overlap": 6}
     findings.sort(key=lambda f: order[f.type])
     findings = [f.model_copy(update={"id": f"F{i}"}) for i, f in enumerate(findings, 1)]
 
@@ -632,7 +756,7 @@ def match(docs: list[Document], extractions: dict[str, Extraction], pm: Prematch
     status_counts = Counter(f.status for f in functions.values())
     step.notes = (f"групп {len(groups)}, вызовов {len(calls)} (повторов {sum(c.attempts - 1 for c in ok_calls)}, "
                   f"неудачных {len(failed)}); вердиктов модели {len(verdicts) - len(pm.preserved)}; "
-                  f"статусы: {dict(status_counts)}; дублей {len(dup_functions)}, конфликтов {len(seen_conf)}; "
+                  f"статусы: {dict(status_counts)}; дублей {len(dup_functions)}, кандидатов в конфликты {len(conflicts)}; "
                   f"не определено {len(unresolved)}")
     result = MatchResult(units=units, functions=list(functions.values()) + dup_functions, findings=findings,
                          warnings=warnings, complete=not failed and not unresolved)

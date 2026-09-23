@@ -16,7 +16,9 @@ SECTIONS = [
     ("transfer", "Перенесённые функции"),
     ("duplication", "Дублирование функций"),
     ("conflict", "Конфликт интересов — кандидаты на проверку сотрудником"),
+    ("overlap", "Пересечение ответственности"),
 ]
+REJECTED_TITLE = "Отклонено верификатором (в выводах не учитывается)"
 FORBIDDEN = re.compile(r"утрач|уничтож|ликвидир", re.I)
 MAX_CITES = 4
 
@@ -64,13 +66,12 @@ def render_conclusion(result: AnalysisResult, summary: str) -> str:
             if f.recommendation:
                 lines.append(f"  - Рекомендация: {f.recommendation}")
         lines.append("")
+    lines += [f"_Подтверждено верификатором: {len(ok)} из {len(result.findings)}._", ""]
     rejected = [f for f in result.findings if not f.verified]
-    if rejected:
-        lines += ["## Отклонено верификатором (в выводы не включено)", ""]
+    if rejected:  # always the last block
+        lines += [f"## {REJECTED_TITLE}", ""]
         lines += [f"- {f.id}: {f.summary} — причина: {f.rejection_reason}" for f in rejected]
-        lines.append("")
-    lines.append(f"_Подтверждено верификатором: {len(ok)} из {len(result.findings)}._")
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _summary_input(result: AnalysisResult) -> str:

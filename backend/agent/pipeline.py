@@ -15,6 +15,10 @@ from backend.config import settings
 from backend.ingest import ingest_set
 
 ProgressFn = Callable[[str, float, str], None]
+
+
+class UnreadableInput(ValueError):
+    """A file gave no text at all; the message names the file(s)."""
 INCOMPLETE_LOSS = ("Входные данные обработаны не полностью: отсутствие функции в комплекте «после» "
                    "не подтверждается")
 
@@ -68,11 +72,10 @@ def run(before: list[str | Path], after: list[str | Path], progress: ProgressFn 
         warnings += [f"«{d.name}»: {w}" for w in d.warnings]
     trace.append(TraceStep(step="ingest", started_at=t, finished_at=_now(),
                            notes=", ".join(f"{d.name}: {len(d.clauses)} пунктов" for d in docs)))
-    result = AnalysisResult(documents=[d.info() for d in docs], trace=trace)
-    if not any(d.side == "before" and d.clauses for d in docs) or not any(d.side == "after" and d.clauses for d in docs):
-        result.analysis_complete = False
-        result.warnings = warnings + ["Нужен хотя бы один читаемый документ в каждом комплекте"]
-        return result
+    unreadable = [f"«{d.name}»: {'; '.join(d.warnings) or 'текст не извлечён'}" for d in docs if not d.clauses]
+    if unreadable:  # the whole job fails, naming every file that could not be read
+        raise UnreadableInput("Не удалось прочитать файлы (повреждены или скан без текстового слоя, OCR не "
+                              "поддерживается): " + "; ".join(unreadable))
 
     say("extract", 0.08, f"Извлечение функций из {len(docs)} документов")
     extracted, steps = run_extract(docs, client=client, use_cache=use_cache)
@@ -108,6 +111,8 @@ def run(before: list[str | Path], after: list[str | Path], progress: ProgressFn 
     result.conclusion_md, step = report(result, client=client)
     trace.append(step)
 
+    result.stats.citations_corrected = sum(r.repaired for r in extracted.values())
+    result.stats.functions_dropped = sum(r.dropped for r in extracted.values())
     costs = [s.cost_usd for s in trace if s.model]
     result.stats.cost_usd = None if any(c is None for c in costs) else round(sum(costs), 4)
     result.stats.duration_s = round(time.monotonic() - started, 1)

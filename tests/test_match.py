@@ -129,3 +129,50 @@ def test_missing_verdicts_get_one_follow_up_call():
     _, result, client = analyse(BASE, deleted, {"verdicts": lazy})
     assert len(seen) == 2 and len(seen[1]) == 1
     assert all(f.status == "lost" for f in result.functions if f.id in {i for s in seen for i in s})
+
+
+CONFLICT_DOC = STRUCTURE + [
+    ("2", "Функции"),
+    ("2.1", "Отдел контроля проводит проверки закупок."),                 # B1 ОК performs
+    ("2.2", "Отдел контроля контролирует качество проверок закупок."),    # B2 ОК controls the same activity
+    ("2.3", "Отдел планирования составляет график инвентаризации."),      # B3 ОП performs
+    ("2.4", "Отдел планирования оценивает качество инвентаризации."),     # B4 ОП controls the same activity
+]
+
+
+def test_conflict_confidence_is_graded_by_checkable_evidence():
+    from backend.agent.match import ConflictCheck, Ref, StructureOutput
+
+    def check(subject, performs, controls, refs=(), staff=()):
+        return ConflictCheck(side="before", subject=subject, controls="проверки", control_ids=list(controls),
+                             performs_ids=list(performs), performer_roles=list(staff), shared_staff=[],
+                             refs=list(refs), is_conflict=True, resolved_in_after=True,
+                             comment="Кандидат на проверку сотрудником: совмещение.", severity="high")
+
+    def grade(*checks):
+        _, result, _ = analyse(CONFLICT_DOC, CONFLICT_DOC,
+                               {"structure": StructureOutput(checks=list(checks), composition_changes=[])})
+        return result, [f for f in result.findings if f.type in ("conflict", "overlap")]
+
+    structure_ref = Ref(doc_id="before-1", clause_id="1.1", quote="Блок состоит из Отдела планирования (ОП)")
+    result, found = grade(check("Отдел контроля", ["B1"], ["B2"], [structure_ref], ["Отдел планирования"]),
+                          check("Отдел планирования", ["B3"], ["B4"]))
+    assert {(f.type, f.confidence) for f in found} == {("conflict", "high"), ("conflict", "medium")}
+    high = next(f for f in found if f.confidence == "high")
+    assert high.verified and "устранён" in high.summary and high.severity == "low"
+    assert {e.clause_id for e in high.evidence} == {"2.1", "2.2", "1.1"}
+    assert any(f.conflict_of_interest for f in result.functions)
+
+    # performs belongs to another unit -> only the control is the subject's: one condition -> overlap
+    result, found = grade(check("Отдел контроля", ["B3"], ["B2"]))
+    assert [(f.type, f.confidence, f.severity) for f in found] == [("overlap", "low", "low")]
+    assert "Пересечение ответственности" in found[0].summary
+    assert not any(f.conflict_of_interest for f in result.functions)
+
+    # nothing owned by the subject, the subject named as its own staff -> dropped
+    _, found = grade(check("Рабочая группа", ["B1"], ["B2"], [structure_ref], ["Рабочая группа"]))
+    assert found == []
+
+    # a subject outside the org structure is at most an overlap
+    _, found = grade(check("Внешний эксперт", ["B1"], ["B2"]))
+    assert found == []  # its functions are not its own either
