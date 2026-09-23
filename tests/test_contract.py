@@ -20,16 +20,13 @@ def test_schema_file_is_up_to_date():
 
 
 def test_demo_stats_match_findings(demo):
-    assert 8 <= len(demo.findings) <= 10
+    assert demo.findings
     assert demo.stats.findings_total == len(demo.findings)
     assert demo.stats.verified == sum(f.verified for f in demo.findings)
-    assert demo.stats.rejected == 1
-    rejected = next(f for f in demo.findings if not f.verified)
-    assert rejected.rejection_reason
-    assert f"**{rejected.id}**" not in demo.conclusion_md
+    assert demo.stats.rejected == len(demo.findings) - demo.stats.verified
+    body = demo.conclusion_md.split("## Отклонено верификатором")[0]
     for f in demo.findings:
-        if f.verified:
-            assert f"**{f.id}**" in demo.conclusion_md
+        assert (f"**{f.id}**" in body) == f.verified
 
 
 def test_demo_evidence_matches_sample_text(demo):

@@ -102,6 +102,7 @@
         "type": {
           "enum": [
             "loss",
+            "change",
             "transfer",
             "duplication",
             "conflict",
@@ -296,6 +297,31 @@
           "default": 0,
           "title": "Rejected",
           "type": "integer"
+        },
+        "duration_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration S"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sum of LLM costs; null if a model price is unknown",
+          "title": "Cost Usd"
         }
       },
       "title": "Stats",
@@ -360,6 +386,30 @@
           ],
           "default": null,
           "title": "Output Tokens"
+        },
+        "cached_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Tokens"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
         },
         "notes": {
           "default": "",
@@ -488,7 +538,9 @@
       "default": {
         "findings_total": 0,
         "verified": 0,
-        "rejected": 0
+        "rejected": 0,
+        "duration_s": null,
+        "cost_usd": null
       }
     },
     "analysis_complete": {

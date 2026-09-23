@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 Side = Literal["before", "after"]
 UnitStatus = Literal["created", "preserved", "transformed", "eliminated"]
 FunctionStatus = Literal["preserved", "transferred", "changed", "lost", "duplicated"]
-FindingType = Literal["loss", "transfer", "duplication", "conflict", "structure"]
+FindingType = Literal["loss", "change", "transfer", "duplication", "conflict", "structure"]
 Severity = Literal["high", "medium", "low"]
 
 
@@ -148,6 +148,8 @@ class Stats(BaseModel):
     findings_total: int = 0
     verified: int = 0
     rejected: int = 0
+    duration_s: float | None = None
+    cost_usd: float | None = Field(None, description="Sum of LLM costs; null if a model price is unknown")
 
 
 class TraceStep(BaseModel):
@@ -157,6 +159,8 @@ class TraceStep(BaseModel):
     model: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    cached_tokens: int | None = None
+    cost_usd: float | None = None
     notes: str = ""
 
 

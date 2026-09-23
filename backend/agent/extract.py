@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel
 
-from backend.agent.llm import LLMCall, LLMError, call_structured
+from backend.agent.llm import LLMCall, LLMError, call_structured, cost_usd
 from backend.agent.schemas import Clause, Document, Extraction, ExtractedFunction, TraceStep
 from backend.agent.verify import locate_quote
 from backend.config import ROOT, settings
@@ -36,6 +36,7 @@ class DocExtraction(BaseModel):
     extraction: Extraction = Extraction(units=[], roles=[], functions=[])
     repaired: int = 0
     dropped: int = 0
+    dropped_functions: list[ExtractedFunction] = []  # quote not found anywhere in the document
 
 
 def _content(doc: Document) -> list[Clause]:
@@ -74,14 +75,15 @@ def chunk_clauses(doc: Document, size: int = CHUNK_CLAUSES) -> list[tuple[str, l
     return chunks
 
 
-def clean(doc: Document, extraction: Extraction) -> tuple[Extraction, int, int]:
+def clean(doc: Document, extraction: Extraction) -> tuple[Extraction, int, list[ExtractedFunction]]:
     """Point every function at the clause that really contains its quote; drop unsupported ones."""
     functions: list[ExtractedFunction] = []
-    seen, repaired, dropped = set(), 0, 0
+    dropped: list[ExtractedFunction] = []
+    seen, repaired = set(), 0
     for fn in extraction.functions:
         clause_id = locate_quote(doc, fn.quote, hint=fn.clause_id)
         if clause_id is None:
-            dropped += 1
+            dropped.append(fn)
             continue
         if clause_id != fn.clause_id:
             repaired += 1
@@ -119,6 +121,8 @@ def extract_document(doc: Document, client=None) -> tuple[DocExtraction, TraceSt
     step.finished_at = datetime.now(timezone.utc)
     step.input_tokens = sum(c.input_tokens for c in calls)
     step.output_tokens = sum(c.output_tokens for c in calls)
+    step.cached_tokens = sum(c.cached_tokens for c in calls)
+    step.cost_usd = cost_usd(settings.model_extract, step.input_tokens, step.output_tokens, step.cached_tokens)
     failed = [c for c in calls if isinstance(c, LLMError)]
     ok_calls = [c for c in calls if isinstance(c, LLMCall)]
     merged = Extraction(
@@ -130,10 +134,10 @@ def extract_document(doc: Document, client=None) -> tuple[DocExtraction, TraceSt
     retries = sum(c.attempts - 1 for c in ok_calls)
     step.notes = (f"{len(extraction.units)} подразделений, {len(extraction.roles)} ролей, "
                   f"{len(extraction.functions)} функций; вызовов {len(calls)} (повторов {retries}, "
-                  f"неудачных {len(failed)}); ссылок исправлено {repaired}, отброшено {dropped}")
+                  f"неудачных {len(failed)}); ссылок исправлено {repaired}, отброшено {len(dropped)}")
     error = f"{len(failed)} из {len(calls)} вызовов не удались: {failed[0]}" if failed else None
     return DocExtraction(doc_id=doc.doc_id, ok=not failed, error=error, extraction=extraction,
-                         repaired=repaired, dropped=dropped), step
+                         repaired=repaired, dropped=len(dropped), dropped_functions=dropped), step
 
 
 def extract_all(docs: list[Document], client=None) -> tuple[dict[str, DocExtraction], list[TraceStep]]:

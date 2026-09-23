@@ -96,3 +96,49 @@ def test_locate_quote_repairs_clause_id(docs):
     assert locate_quote(doc, "порядка оценки эффективности бизнес-процессов", hint="5.3.3") == "5.3.3.б"
     assert locate_quote(doc, "на ежеквартальной основе", hint="5.5.5") == "5.5.5"
     assert locate_quote(doc, "совершенно другой текст про закупки") is None
+
+
+def two_side_docs():
+    before = Document(doc_id="before-1", name="b.pdf", side="before", pages=1, clauses=[
+        Clause(clause_id="5.5.3", text=";", page=9),
+        Clause(clause_id="5.6.2", text="формировать группы контроля качества с привлечением работников БВА;", page=10)])
+    after = Document(doc_id="after-1", name="a.pdf", side="after", pages=1, clauses=[
+        Clause(clause_id="5.3.3", text="готовят предложения для включения в план работ БВА;", page=8),
+        Clause(clause_id="5.4.2", text="готовит предложения для включения в план работ БВА;", page=9)])
+    return {d.doc_id: d for d in (before, after)}
+
+
+def ev(doc_id, clause_id, quote):
+    return Evidence(doc_id=doc_id, clause_id=clause_id, quote=quote)
+
+
+def test_empty_clause_verifies_only_by_exact_text():
+    docs = two_side_docs()
+    assert check_evidence(ev("before-1", "5.5.3", ";"), docs) is None
+    assert check_evidence(ev("before-1", "5.5.3", ","), docs)
+
+
+def test_transfer_needs_both_sides():
+    docs = two_side_docs()
+    one_side = Finding(id="F1", type="transfer", severity="low", summary="s",
+                       evidence=[ev("before-1", "5.6.2", "формировать группы контроля качества")])
+    assert "обеих редакций" in verify_finding(one_side, docs).rejection_reason
+
+
+def test_duplication_needs_two_after_clauses():
+    docs = two_side_docs()
+    dup = Finding(id="F1", type="duplication", severity="low", summary="s",
+                  evidence=[ev("after-1", "5.3.3", "готовят предложения для включения в план работ БВА")])
+    assert not verify_finding(dup, docs).verified
+    dup.evidence.append(ev("after-1", "5.4.2", "готовит предложения для включения в план работ БВА"))
+    assert verify_finding(dup, docs).verified
+
+
+def test_loss_quoted_in_after_set_is_rejected():
+    docs = two_side_docs()
+    docs["after-1"].clauses.append(Clause(clause_id="5.7.1", text="формировать группы контроля качества с привлечением "
+                                                                    "работников БВА;", page=10))
+    loss = Finding(id="F1", type="loss", severity="high", summary="s",
+                   evidence=[ev("before-1", "5.6.2", "формировать группы контроля качества с привлечением работников БВА")])
+    out = verify_finding(loss, docs)
+    assert not out.verified and "5.7.1" in out.rejection_reason

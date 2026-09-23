@@ -15,9 +15,9 @@ DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 
 class LLMError(RuntimeError):
-    def __init__(self, message: str, input_tokens: int = 0, output_tokens: int = 0):
+    def __init__(self, message: str, input_tokens: int = 0, output_tokens: int = 0, cached_tokens: int = 0):
         super().__init__(message)
-        self.input_tokens, self.output_tokens = input_tokens, output_tokens
+        self.input_tokens, self.output_tokens, self.cached_tokens = input_tokens, output_tokens, cached_tokens
 
 
 @dataclass
@@ -28,6 +28,7 @@ class LLMCall:
     output_tokens: int
     seconds: float
     attempts: int
+    cached_tokens: int = 0
 
 
 @lru_cache
@@ -44,7 +45,7 @@ def call_structured(*, model: str, reasoning: str | None, instructions: str, inp
                     schema: type[T], client=None, max_output_tokens: int = 64000) -> LLMCall:
     """One call + one retry on schema/validation problems. Raises LLMError after the second failure."""
     client = client or get_client()
-    tokens_in = tokens_out = 0
+    tokens_in = tokens_out = cached = 0
     started = time.monotonic()
     last_error = ""
     for attempt in (1, 2):
@@ -61,10 +62,20 @@ def call_structured(*, model: str, reasoning: str | None, instructions: str, inp
         usage = getattr(response, "usage", None)
         tokens_in += getattr(usage, "input_tokens", 0) or 0
         tokens_out += getattr(usage, "output_tokens", 0) or 0
+        cached += getattr(getattr(usage, "input_tokens_details", None), "cached_tokens", 0) or 0
         parsed = getattr(response, "output_parsed", None)
         if parsed is not None:
-            return LLMCall(parsed, model, tokens_in, tokens_out, time.monotonic() - started, attempt)
+            return LLMCall(parsed, model, tokens_in, tokens_out, time.monotonic() - started, attempt, cached)
         details = getattr(response, "incomplete_details", None)
         last_error = f"пустой структурированный ответ (status={getattr(response, 'status', '?')}, {details})"
         log.warning("%s attempt %d: %s", schema.__name__, attempt, last_error)
-    raise LLMError(last_error, tokens_in, tokens_out)
+    raise LLMError(last_error, tokens_in, tokens_out, cached)
+
+
+def cost_usd(model: str | None, input_tokens: int, output_tokens: int, cached_tokens: int = 0) -> float | None:
+    """USD cost from settings.prices (per 1M tokens: input, cached input, output); None if the price is unknown."""
+    price = settings.prices.get(model or "")
+    if price is None:
+        return None
+    p_in, p_cached, p_out = price
+    return round(((input_tokens - cached_tokens) * p_in + cached_tokens * p_cached + output_tokens * p_out) / 1e6, 4)
