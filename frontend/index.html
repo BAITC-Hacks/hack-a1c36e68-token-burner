@@ -221,6 +221,8 @@
     .file-list{list-style:none;margin:14px 0 0;padding:0}.file-list li{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}.file-info{flex:1;min-width:0}.file-name{display:block;overflow-wrap:anywhere;font-size:13px}.file-info small{color:var(--muted)}.file-remove{padding:4px 8px;font-size:12px}
     .flow-actions{display:flex;align-items:center;gap:20px;margin-top:22px}.primary{background:var(--accent);border-color:var(--accent);color:white;font-weight:600}.upload-empty{margin-top:14px;font-size:12px;color:var(--muted)}.flow-error{margin-top:18px}.result-actions{display:flex;align-items:center;gap:12px}
     @media(max-width:700px){.upload-grid{grid-template-columns:1fr}.flow-actions,.result-actions{flex-wrap:wrap}.topbar-note{display:none}}
+    .progress-screen{max-width:760px}.progress-card{margin-top:22px;border:1px solid var(--line);border-radius:5px;background:var(--paper);padding:22px}.progress-label{display:flex;justify-content:space-between;gap:14px;margin-bottom:10px}.progress-bar{width:100%;height:8px;display:block;appearance:none;border:0;background:var(--line);color:var(--accent);border-radius:4px;overflow:hidden}.progress-bar::-webkit-progress-bar{background:var(--line)}.progress-bar::-webkit-progress-value{background:var(--accent)}.progress-bar::-moz-progress-bar{background:var(--accent)}
+    .pipeline{list-style:none;padding:0;margin:20px 0 0}.pipeline li{display:flex;gap:12px;align-items:center;padding:10px 12px;border-left:2px solid var(--line)}.pipeline li.current{background:var(--tint);border-color:var(--accent)}.pipeline li.complete{border-color:var(--accent)}.step-marker{width:24px;flex-shrink:0;text-align:center;color:var(--muted);font:12px var(--mono)}.complete .step-marker,.current .step-marker{color:var(--accent)}.step-text{flex:1}.step-text strong{font-size:13px}.step-text p,.step-time{font-size:12px;color:var(--muted)}.step-time{white-space:nowrap}.job-meta{display:block;margin-top:16px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.simulation-label{color:var(--accent);font-size:12px;margin-top:10px}
   </style>
   <!-- Vendored Vue 3.5.43 production global build; no external runtime requests. -->
   <script src="vendor/vue.global.prod.js"></script>
@@ -229,13 +231,13 @@
   <noscript>Для просмотра результатов включите JavaScript в браузере.</noscript>
   <div id="app" v-cloak>
     <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">≋</span>Контур изменений</div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">≋</span>Контур изменений</div>
       <span class="topbar-note">Аудит организационных документов</span>
     </header>
     <main class="workspace">
       <section v-if="screen==='upload'" class="flow-screen" aria-labelledby="upload-title">
         <p class="eyebrow">Новое сравнение</p><h1 id="upload-title">Документы реорганизации</h1><p class="flow-intro">Загрузите редакции документов. Анализ сопоставит структуру, функции и ответственность со ссылками на исходные пункты.</p>
+        <p v-if="simulateAPI" class="notice">Режим имитации: документы не отправляются на сервер; результат будет демонстрационным.</p>
         <form @submit.prevent="startAnalysis">
           <div class="upload-grid"><section v-for="side in sides" :key="side.id" class="upload-set"><h2>{{ side.label }}<span class="count">{{ files[side.id].length }}</span></h2>
             <label class="drop-zone" :class="{dragging:dragSide===side.id}" @dragover.prevent="dragSide=side.id" @dragleave.prevent="dragSide=''" @drop.prevent="dropFiles(side.id,$event)">
@@ -247,10 +249,17 @@
           <div class="flow-actions"><button type="submit" class="primary" :disabled="!canAnalyze || submitting">{{ submitting ? 'Отправляем документы…' : 'Анализировать' }}</button><a href="?demo=1" @click="submitting && $event.preventDefault()">Открыть демо-результат</a><span class="muted" aria-live="polite">Выбрано файлов: {{ files.before.length+files.after.length }}</span></div>
         </form>
       </section>
-      <section v-else-if="screen==='progress'" class="flow-screen"><p class="eyebrow">Обработка документов</p><h1>Анализ запущен</h1><p class="flow-intro">Задание принято: <code>{{ jobId }}</code></p><button @click="backToUpload">Назад</button></section>
+      <section v-else-if="screen==='progress'" class="flow-screen progress-screen" aria-labelledby="progress-title">
+        <p class="eyebrow">Обработка документов</p><h1 id="progress-title">{{ error ? (job.status==='error' ? 'Анализ не завершён' : 'Проверка приостановлена') : 'Анализ реорганизации' }}</h1>
+        <p v-if="simulateAPI" class="simulation-label">Имитация анализа · демонстрационные данные</p>
+        <div v-if="error" class="notice flow-error" role="alert"><p>{{ error }}</p><div class="flow-actions"><button v-if="pollRetryable" @click="resumePolling">Повторить проверку</button><button @click="backToUpload">Назад</button></div></div>
+        <div class="progress-card"><div class="progress-label" aria-live="polite"><strong>{{ error ? (job.status==='error' ? 'Не удалось завершить анализ' : 'Связь с сервером прервана') : job.status==='queued' ? 'Задание в очереди' : 'Выполняется: '+currentStepLabel }}</strong><span>{{ progressPercent }}%</span></div><progress class="progress-bar" :value="progressPercent" max="100" aria-label="Прогресс анализа">{{ progressPercent }}%</progress>
+          <ol class="pipeline"><li v-for="(step,index) in progressSteps" :key="step.id" :class="{current:step.current,complete:step.complete}" :aria-current="step.current ? 'step' : undefined"><span class="step-marker" aria-hidden="true">{{ step.complete ? '✓' : String(index+1).padStart(2,'0') }}</span><div class="step-text"><strong>{{ step.label }}</strong><p>{{ step.description }}</p></div><span class="step-time">{{ step.complete ? step.duration || 'Время не передано' : step.current ? (error ? (job.status==='error' ? 'Ошибка' : 'Приостановлен') : 'В работе') : 'Ожидание' }}</span></li></ol>
+          <span class="job-meta">Задание <code>{{ jobId }}</code></span>
+        </div>
+      </section>
       <div v-else-if="loading" class="loading" role="status">
-        <span class="spinner" aria-hidden="true">
-        </span>
+        <span class="spinner" aria-hidden="true"></span>
         <p>Загружаем результат анализа…</p>
       </div>
       <div v-else-if="error" class="notice error" role="alert">
@@ -269,14 +278,11 @@
             <div class="result-actions"><button @click="backToUpload">К документам</button><span class="state-label">{{ result.analysis_complete ? 'Анализ завершён' : 'Неполный анализ' }}</span></div>
           </div>
           <div class="stats" aria-label="Статистика выводов">
-            <span>
-              <strong>{{ result.stats.findings_total }}</strong> выводов</span>
+            <span><strong>{{ result.stats.findings_total }}</strong> выводов</span>
             <span class="separator">·</span>
-            <span class="verified">
-              <strong>{{ result.stats.verified }}</strong> подтверждено</span>
+            <span class="verified"><strong>{{ result.stats.verified }}</strong> подтверждено</span>
             <span class="separator">·</span>
-            <span>
-              <strong>{{ result.stats.rejected }}</strong> отклонено верификатором</span>
+            <span><strong>{{ result.stats.rejected }}</strong> отклонено верификатором</span>
           </div>
           <div v-if="!result.analysis_complete || result.warnings.length" class="notice" role="status">
             <template v-if="!result.analysis_complete">
@@ -540,6 +546,25 @@
     const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
     const SIMULATE_API = false; // Local development only: emulate API requests against demo_result.json.
     const USE_CLAUSE_API = false; // Enable GET /api/clause when the backend is ready; Evidence remains the fallback.
+    const PIPELINE=[{id:'ingest',label:'Чтение документов',description:'Извлечение текста и пунктов'}, {id:'extract',label:'Извлечение структуры и функций',description:'Подразделения, действия и исполнители'}, {id:'prematch',label:'Предварительное сопоставление',description:'Поиск точных и близких совпадений'}, {id:'match',label:'Сопоставление редакций',description:'Изменения функций и ответственности'}, {id:'verify',label:'Верификация выводов',description:'Проверка ссылок и цитат'}, {id:'report',label:'Подготовка заключения',description:'Сводка подтверждённых выводов'}];
+    const stepId=value => String(value || '').toLowerCase().split(':')[0];
+    const simulationJobs=new Map();
+    function simulationDelay(ms,signal) {
+      return new Promise((resolve,reject) => { const abort=() => { clearTimeout(timer); signal?.removeEventListener('abort',abort); reject(new DOMException('Операция отменена','AbortError')); };
+        const timer=setTimeout(() => { signal?.removeEventListener('abort',abort); resolve(); },ms); signal?.addEventListener('abort',abort,{once:true}); if(signal?.aborted) abort(); });
+    }
+    async function apiRequest(url,options={},timeoutMs=15000) {
+      if(!SIMULATE_API) return requestJSON(url,options,timeoutMs);
+      await simulationDelay(url==='/api/analyze' ? 450 : 120,options.signal);
+      if(url==='/api/analyze') { const id='simulation-'+Date.now(); simulationJobs.clear(); simulationJobs.set(id,Date.now()+1000); return {job_id:id}; }
+      if(url.startsWith('/api/jobs/')) {
+        const start=simulationJobs.get(decodeURIComponent(url.slice('/api/jobs/'.length))); if(start===undefined) throw new Error('Задание имитации не найдено. Запустите анализ заново.');
+        const elapsed=Date.now()-start, index=Math.floor(Math.max(0,elapsed)/3000), done=index>=PIPELINE.length;
+        const trace=PIPELINE.flatMap((step,i) => elapsed<i*3000 ? [] : [{step:step.id,started_at:new Date(start+i*3000).toISOString(),finished_at:elapsed>=(i+1)*3000 ? new Date(start+(i+1)*3000).toISOString() : null}]);
+        return {status:done ? 'done' : elapsed<0 ? 'queued' : 'running',step:PIPELINE[Math.min(index,5)].id,progress:Math.min(1,Math.max(0,elapsed)/18000),trace,...(done ? {result:await requestJSON('./demo_result.json',{signal:options.signal})} : {})};
+      }
+      return requestJSON(url==='/api/demo' ? './demo_result.json' : url,options,timeoutMs);
+    }
     async function requestJSON(url,options={},timeoutMs=15000) {
       const controller=new AbortController(), abort=() => controller.abort(); let timedOut=false;
       options.signal?.addEventListener('abort',abort,{once:true}); if(options.signal?.aborted) abort();
@@ -618,8 +643,9 @@
         const result = ref(null), loading = ref(false), error = ref(''), activeTab = ref('structure'), selectedEvidence = ref(null);
         const screen=ref('upload'), localDemo=ref(false), files=ref({before:[],after:[]}), dragSide=ref(''), fileError=ref(''), submitting=ref(false), jobId=ref('');
         const canAnalyze=computed(() => files.value.before.length+files.value.after.length>0);
-        let flowController=null, flowVersion=0;
-        function stopFlow() { flowVersion++; flowController?.abort(); }
+        const job=ref({status:'queued',step:'',progress:0,trace:[]}), pollRetryable=ref(false);
+        let flowController=null, flowVersion=0, pollTimer=null;
+        function stopFlow() { flowVersion++; flowController?.abort(); clearTimeout(pollTimer); pollTimer=null; }
         function backToUpload() { stopFlow(); closeSource(); screen.value='upload'; error.value=''; loading.value=false; submitting.value=false; history.replaceState(null,'',location.pathname); }
         function addFiles(side,incoming) {
           if(submitting.value) return; const invalid=[];
@@ -634,11 +660,31 @@
           if(!canAnalyze.value || submitting.value) return;
           stopFlow(); const version=flowVersion; flowController=new AbortController(); submitting.value=true; error.value='';
           const body=new FormData(); for(const side of ['before','after']) for(const file of files.value[side]) body.append(side+'[]',file,file.name);
-          try { const response=SIMULATE_API ? {job_id:'simulation'} : await requestJSON('/api/analyze',{method:'POST',body,signal:flowController.signal},45000);
+          try { const response=await apiRequest('/api/analyze',{method:'POST',body,signal:flowController.signal},45000);
             if(!response || typeof response.job_id!=='string' || !response.job_id) throw new Error('Сервис не вернул номер задания. Повторите попытку.');
-            if(version!==flowVersion) return; jobId.value=response.job_id; screen.value='progress';
+            if(version!==flowVersion) return; jobId.value=response.job_id; job.value={status:'queued',step:'',progress:0,trace:[]}; pollRetryable.value=false; screen.value='progress'; pollJob(version);
           } catch(err) { if(version===flowVersion) error.value=err.message; } finally { if(version===flowVersion) submitting.value=false; }
         }
+        const progressPercent=computed(() => Math.round(Math.max(0,Math.min(1,Number(job.value.progress) || 0))*100));
+        const currentStepLabel=computed(() => PIPELINE.find(step => step.id===stepId(job.value.step))?.label || 'обработка документов');
+        const progressSteps=computed(() => PIPELINE.map((step,index) => {
+          const trace=(job.value.trace || []).filter(item => stepId(item.step)===step.id), current=job.value.status!=='queued' && stepId(job.value.step)===step.id;
+          const complete=!current && (index<PIPELINE.findIndex(item => item.id===stepId(job.value.step)) || (trace.length>0 && trace.every(item => item.finished_at)));
+          const starts=trace.map(item => Date.parse(item.started_at)), ends=trace.map(item => Date.parse(item.finished_at));
+          const seconds=(Math.max(...ends)-Math.min(...starts))/1000, duration=trace.length && starts.every(Number.isFinite) && ends.every(Number.isFinite) && seconds>=0 ? seconds.toLocaleString('ru',{maximumFractionDigits:1})+' с' : '';
+          return {...step,current,complete,duration};
+        }));
+        async function pollJob(version) {
+          try {
+            const data=await apiRequest('/api/jobs/'+encodeURIComponent(jobId.value),{signal:flowController.signal}); if(version!==flowVersion) return;
+            if(!data || !['queued','running','done','error'].includes(data.status)) throw new Error('Сервис вернул неизвестный статус задания.');
+            job.value={...data,trace:Array.isArray(data.trace) ? data.trace.filter(item => item && typeof item==='object') : job.value.trace};
+            if(data.status==='error') { error.value=typeof data.error==='string' && data.error.trim() ? data.error : 'Анализ завершился с ошибкой. Вернитесь к документам и повторите попытку.'; pollRetryable.value=false; return; }
+            if(data.status==='done') { acceptResult(data.result,SIMULATE_API); return; }
+            pollTimer=setTimeout(() => pollJob(version),1500);
+          } catch(err) { if(version===flowVersion) { error.value=err.message; pollRetryable.value=true; } }
+        }
+        function resumePolling() { stopFlow(); flowController=new AbortController(); error.value=''; pollRetryable.value=false; pollJob(flowVersion); }
         const statusFilter=ref('changes'), unitFilter=ref(''), expandedFunction=ref(null), findingFilter=ref(''), currentHeading=ref('');
         const functionLabels={preserved:'Сохранена',transferred:'Передана',changed:'Изменена',lost:'Не найдена в комплекте «после»',duplicated:'Дублируется'};
         const findingTypes={loss:'Не найдена в комплекте «после»',transfer:'Перенос',duplication:'Дублирование',conflict:'Конфликт интересов',structure:'Структура'};
@@ -734,20 +780,20 @@
           nextTick(() => document.getElementById('tab-'+activeTab.value)?.focus());
         }
         function acceptResult(data,demo=false) {
-          if(!data || typeof data!=='object' || Array.isArray(data) || ['documents','units','functions','findings','warnings','trace'].some(key => data[key]!=null && !Array.isArray(data[key])) || (data.conclusion_md!=null && typeof data.conclusion_md!=='string')) throw new Error('Сервис вернул некорректный результат.');
+          if(!data || typeof data!=='object' || Array.isArray(data) || ['documents','units','functions','findings','warnings','trace'].some(key => data[key]!==undefined && !Array.isArray(data[key])) || (data.conclusion_md!==undefined && typeof data.conclusion_md!=='string')) throw new Error('Сервис вернул некорректный результат.');
           result.value={documents:[],units:[],functions:[],findings:[],conclusion_md:'',analysis_complete:true,warnings:[],trace:[],...data,stats:{findings_total:0,verified:0,rejected:0,...data.stats}};
           localDemo.value=demo; activeTab.value='structure'; resetFilters(); expandedFunction.value=null; currentHeading.value=''; screen.value='results';
         }
         async function loadResult() {
           stopFlow(); const version=flowVersion; flowController=new AbortController(); screen.value='demo'; loading.value=true; error.value='';
-          try { const data=await requestJSON(SIMULATE_API ? './demo_result.json' : '/api/demo',{signal:flowController.signal}); if(version===flowVersion) acceptResult(data,true); }
+          try { const data=await apiRequest('/api/demo',{signal:flowController.signal}); if(version===flowVersion) acceptResult(data,true); }
           catch(err) { if(version===flowVersion) error.value='Не удалось загрузить демо-результат. '+err.message; }
           finally { if(version===flowVersion) loading.value=false; }
         }
         onMounted(() => { if(new URLSearchParams(location.search).get('demo')==='1') loadResult(); });
         onUnmounted(stopFlow);
         return {result,loading,error,activeTab,selectedEvidence,localDemo,sides,tabs,unitGroups,documentsFor,evidenceKey,selectEvidence,tabKey,loadResult,
-          screen,files,dragSide,fileError,submitting,canAnalyze,jobId,backToUpload,chooseFiles,dropFiles,fileSize,startAnalysis,
+          screen,files,dragSide,fileError,submitting,canAnalyze,jobId,backToUpload,chooseFiles,dropFiles,fileSize,startAnalysis,job,pollRetryable,progressPercent,currentStepLabel,progressSteps,resumePolling,simulateAPI:SIMULATE_API,
           statusFilter,unitFilter,expandedFunction,functionLabels,owners,unitOptions,filteredFunctions,evidenceFor,findingsFor,toggleFunction,resetFilters,conclusionHtml,printConclusion,
           findingTypes,severityLabels,rejectedFindings,functionById,openFunction,statusCounts,changedCount,findingCards,findingFilter,activeFindingCard,toggleFinding,
           conclusionDocument,currentHeading,goToHeading,source,sourceDialog,sourceBusy,sourceError,sourceDocument,sourceHighlight,closeSource};
