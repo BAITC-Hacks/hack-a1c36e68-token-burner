@@ -32,6 +32,10 @@
     .loading{padding:100px 24px;text-align:center}.spinner{width:22px;height:22px;display:inline-block;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}@keyframes spin{to{transform:rotate(360deg)}}
     .error{max-width:680px;margin:60px auto}.error button{margin-top:12px}code{font-family:var(--mono)}
     @media(max-width:800px){.workspace{padding:20px 16px}.topbar{padding:0 16px}.topbar-note{display:none}h1{font-size:24px}.documents{grid-template-columns:1fr}.unit-group{grid-template-columns:1fr;gap:8px}.unit-card{grid-template-columns:1fr;gap:12px}.tabs{gap:20px}.report-heading{align-items:start}.state-label{white-space:normal}.section-meta{display:none}}
+    .filters{display:flex;gap:12px;align-items:end;padding:12px 16px;border:1px solid var(--line);border-bottom:0;background:var(--paper);border-radius:5px 5px 0 0;flex-wrap:wrap}.filter{display:grid;gap:4px;font-size:11px;font-weight:600;color:var(--muted)}select{padding:7px 30px 7px 10px;max-width:340px;background:var(--paper);border:1px solid var(--line);border-radius:4px;font-size:13px}.filter-count{margin-left:auto;font-size:12px;color:var(--muted);padding-bottom:8px}.text-button{color:var(--accent);background:none;border:0;padding:7px 0;font-size:12px}
+    .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:0 0 5px 5px}.functions-table{width:100%;border-collapse:collapse;table-layout:fixed;background:var(--paper);font-size:13px}.functions-table th{text-align:left;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:11px 14px;background:#f9fafb;border-bottom:1px solid var(--line)}.functions-table td{vertical-align:top;padding:14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.functions-table tr:last-child td{border-bottom:0}.function-row{cursor:pointer}.function-row:hover,.function-row.is-expanded{background:#f6f8fc}.function-title{display:flex;text-align:left;gap:9px;align-items:start;border:0;background:none;padding:0;font-weight:600;line-height:1.45}.function-title .chevron{color:var(--accent);min-width:10px}.function-area{display:block;color:var(--muted);font-size:11px;margin:4px 0 0 19px}.owner-list{display:grid;gap:5px}.status-badge{display:inline-block;border:1px solid var(--line);padding:3px 7px;border-radius:4px;font-size:11px;line-height:1.4;background:#f7f8fa}.status-transferred,.status-changed{color:var(--accent);background:var(--tint);border-color:#d1dcf4}.status-lost{border-style:dashed}.status-duplicated{font-weight:650;border-color:#939caa}.conflict-flag{font-size:11px;font-weight:600;display:block;line-height:1.45}.conflict-flag::before{content:'!';display:inline-grid;place-items:center;background:var(--tint);color:var(--accent);border:1px solid #c3d0ed;width:17px;height:17px;border-radius:3px;margin-right:5px}
+    .functions-table .detail-cell{padding:0;background:#fafbfd}.lineage{padding:18px 20px;border-left:3px solid var(--accent)}.lineage-columns{display:grid;grid-template-columns:1fr 1fr;gap:24px}.lineage-column h3{font-size:11px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;color:var(--muted)}.quote-block+.quote-block{margin-top:12px}.quote-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.page-number{font-size:11px;color:var(--muted)}blockquote{margin:8px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);line-height:1.6;font-size:13px}.missing-side{font-size:13px;color:var(--muted);padding:12px;border:1px dashed var(--line);border-radius:4px}.lineage-note{margin-top:14px;font-size:13px}.related-findings{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}.related-findings h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}.related-finding+.related-finding{margin-top:10px}.finding-label{font-size:11px;color:var(--muted);margin-bottom:3px}.finding-label code{font-weight:700;color:var(--text);margin-right:8px}.unverified{border-left:2px dashed #939caa;padding-left:10px}.rejection-inline{color:var(--muted);margin-top:4px}.recommendation{margin-top:12px;padding:10px 12px;background:var(--tint);border-radius:4px;font-size:13px}
+    @media(max-width:800px){.functions-table{min-width:850px}.lineage-columns{gap:16px}select{max-width:280px}}
     @media(prefers-reduced-motion:reduce){.spinner{animation:none}}
   </style>
   <script src="vendor/vue.global.prod.js"></script>
@@ -63,7 +67,21 @@
             <p v-if="!group.units.length" class="group-empty">Нет подразделений с этим статусом</p>
           </div></section>
         </section>
-        <!-- Function tab -->
+        <section v-show="activeTab==='functions'" id="panel-functions" role="tabpanel" aria-labelledby="tab-functions" tabindex="0">
+          <div class="section-heading"><div><h2>Функции и ответственность</h2><p>Раскройте строку, чтобы сопоставить пункты документов и связанные выводы.</p></div><span class="section-meta">{{ result.functions.length }} функций</span></div>
+          <div class="filters"><label class="filter">Статус<select v-model="statusFilter"><option value="">Все статусы</option><option v-for="(label,status) in functionLabels" :value="status" :key="status">{{ label }}</option></select></label><label class="filter">Подразделение<select v-model="unitFilter"><option value="">Все подразделения</option><option v-for="unit in unitOptions" :key="unit.label" :value="unit.label">{{ unit.label }}</option></select></label><button v-if="statusFilter || unitFilter" class="text-button" @click="resetFilters">Сбросить фильтры</button><span class="filter-count" role="status">Показано {{ filteredFunctions.length }} из {{ result.functions.length }}</span></div>
+          <div class="table-wrap"><table class="functions-table"><colgroup><col style="width:31%"><col style="width:17%"><col style="width:22%"><col style="width:16%"><col style="width:14%"></colgroup><thead><tr><th scope="col">Функция</th><th scope="col">Было</th><th scope="col">Стало</th><th scope="col">Статус</th><th scope="col">Конфликт</th></tr></thead><tbody>
+            <template v-for="fn in filteredFunctions" :key="fn.id">
+              <tr class="function-row" :class="{'is-expanded':expandedFunction===fn.id}" @click="toggleFunction(fn.id)"><td><button class="function-title" :id="'function-'+fn.id" :aria-expanded="expandedFunction===fn.id" :aria-controls="'lineage-'+fn.id" @click.stop="toggleFunction(fn.id)"><span class="chevron" aria-hidden="true">{{ expandedFunction===fn.id ? '−' : '+' }}</span><span>{{ fn.action }} {{ fn.object }}</span></button><span class="function-area">{{ fn.area }}</span></td><td><div class="owner-list"><span v-for="owner in owners(fn.owner_before)" :key="owner">{{ owner }}</span></div><span v-if="!fn.owner_before" class="muted">Не указан</span></td><td><div class="owner-list"><span v-for="owner in owners(fn.owner_after)" :key="owner">{{ owner }}</span></div><span v-if="!fn.owner_after" class="muted">Не указан</span></td><td><span class="status-badge" :class="'status-'+fn.status">{{ functionLabels[fn.status] || fn.status }}</span></td><td><span v-if="fn.conflict_of_interest" class="conflict-flag">Кандидат на проверку сотрудником</span><span v-else class="muted" aria-label="Не отмечен">—</span></td></tr>
+              <tr v-if="expandedFunction===fn.id"><td colspan="5" class="detail-cell"><div class="lineage" :id="'lineage-'+fn.id">
+                <div class="lineage-columns"><section v-for="side in sides" :key="side.id" class="lineage-column"><h3>{{ side.id==='before' ? 'Ред. до' : 'Ред. после' }}</h3><div v-for="(ev,index) in evidenceFor(fn,side.id)" :key="index" class="quote-block"><div class="quote-meta"><evidence-chip :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)"></evidence-chip><span v-if="ev.page != null" class="page-number">Стр. {{ ev.page }}</span></div><blockquote>{{ ev.quote }}</blockquote></div><p v-if="!evidenceFor(fn,side.id).length" class="missing-side">{{ side.id==='after' ? 'не найдена в комплекте "после"' : 'не найдена в комплекте "до"' }}</p></section></div>
+                <p v-if="fn.comment" class="lineage-note">{{ fn.comment }}</p><p v-if="fn.recommendation" class="recommendation"><strong>Рекомендация:</strong> {{ fn.recommendation }}</p>
+                <section v-if="findingsFor(fn.id).length" class="related-findings"><h3>Связанные выводы</h3><article v-for="finding in findingsFor(fn.id)" :key="finding.id" class="related-finding" :class="{unverified:!finding.verified}"><p class="finding-label"><code>{{ finding.id }}</code>{{ finding.verified ? 'Подтверждено верификатором' : 'Отклонено верификатором' }}</p><p>{{ finding.summary }}</p><p v-if="!finding.verified" class="rejection-inline">{{ finding.rejection_reason || 'Причина отклонения не указана.' }}</p></article></section>
+              </div></td></tr>
+            </template>
+            <tr v-if="!filteredFunctions.length"><td colspan="5"><div class="empty">{{ result.functions.length ? 'Нет функций, соответствующих фильтрам.' : 'В результате нет функций для сравнения.' }}</div></td></tr>
+          </tbody></table></div>
+        </section>
         <!-- Conclusion tab -->
         <!-- Rejected tab -->
         <footer class="footer"><span>Каждый вывод связан с пунктами исходных документов.</span><span>{{ localDemo ? 'Демонстрационный результат' : 'Результат анализа' }}</span></footer>
@@ -82,11 +100,35 @@
       setup() {
         const result = ref(null), loading = ref(true), error = ref(''), activeTab = ref('structure'), selectedEvidence = ref(null);
         const localDemo = new URLSearchParams(location.search).get('demo') !== '1';
+        const statusFilter=ref(''), unitFilter=ref(''), expandedFunction=ref(null);
+        const functionLabels={preserved:'Сохранена',transferred:'Передана',changed:'Изменена',lost:'Не найдена в комплекте «после»',duplicated:'Дублируется'};
+        const owners=value => (value || '').split(';').map(s => s.trim()).filter(Boolean);
+        const normalized=value => ' '+value.toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim()+' ';
+        const matchesUnit=(owner,unit) => unit.aliases.some(alias => normalized(owner).includes(normalized(alias)));
+        const unitOptions=computed(() => {
+          if(!result.value) return [];
+          const options=result.value.units.map(unit => {
+            const acronym=unit.name.match(/\(([А-ЯЁA-Z0-9-]{2,})\)$/)?.[1];
+            return {label:acronym || unit.name,aliases:[unit.name,unit.before_ref,unit.after_ref,acronym].filter(Boolean)};
+          });
+          for(const fn of result.value.functions) for(const owner of [...owners(fn.owner_before),...owners(fn.owner_after)]) {
+            if(!options.some(unit => matchesUnit(owner,unit))) options.push({label:owner,aliases:[owner]});
+          }
+          return [...new Map(options.map(unit => [unit.label,unit])).values()].sort((a,b) => a.label.localeCompare(b.label,'ru'));
+        });
+        const filteredFunctions=computed(() => {
+          const unit=unitOptions.value.find(u => u.label===unitFilter.value);
+          return (result.value?.functions || []).filter(fn => (!statusFilter.value || fn.status===statusFilter.value) && (!unit || [fn.owner_before,fn.owner_after].filter(Boolean).some(owner => matchesUnit(owner,unit))));
+        });
+        const evidenceFor=(fn,side) => (fn.evidence || []).filter(ev => result.value.documents.find(doc => doc.doc_id===ev.doc_id)?.side===side);
+        const findingsFor=id => result.value.findings.filter(finding => (finding.function_ids || []).includes(id));
+        function toggleFunction(id) { expandedFunction.value=expandedFunction.value===id ? null : id; }
+        function resetFilters() { statusFilter.value=''; unitFilter.value=''; }
         const sides = [{id:'before',label:'До реорганизации'},{id:'after',label:'После'}];
         const unitLabels = {created:'Созданы',preserved:'Сохранены',transformed:'Преобразованы',eliminated:'Упразднены'};
         const tabs = computed(() => [
-          {id:'structure',label:'Структура',count:result.value?.units.length}
-          // Additional result tabs are added below.
+          {id:'structure',label:'Структура',count:result.value?.units.length},
+          {id:'functions',label:'Функции',count:result.value?.functions.length}
         ]);
         const unitGroups = computed(() => Object.entries(unitLabels).map(([id,label]) => ({id,label,units:result.value?.units.filter(u => u.status===id) || []})));
         const documentsFor = side => result.value.documents.filter(doc => doc.side===side);
@@ -110,7 +152,8 @@
           finally { loading.value=false; }
         }
         onMounted(loadResult);
-        return {result,loading,error,activeTab,selectedEvidence,localDemo,sides,tabs,unitGroups,documentsFor,evidenceKey,selectEvidence,tabKey,loadResult};
+        return {result,loading,error,activeTab,selectedEvidence,localDemo,sides,tabs,unitGroups,documentsFor,evidenceKey,selectEvidence,tabKey,loadResult,
+          statusFilter,unitFilter,expandedFunction,functionLabels,owners,unitOptions,filteredFunctions,evidenceFor,findingsFor,toggleFunction,resetFilters};
       }
     }).mount('#app');
   </script>
