@@ -1,10 +1,11 @@
 """Extractor with a fake OpenAI client: prompt input, retry, graceful failure, citation cleanup."""
+import threading
 from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 
-from backend.agent.extract import extract_all, extract_document, render_document
+from backend.agent.extract import chunk_clauses, extract_all, extract_document, render_document
 from backend.agent.schemas import Clause, Document, Extraction, ExtractedFunction, ExtractedUnit
 
 
@@ -32,18 +33,24 @@ def extraction(*functions):
 
 
 class FakeClient:
-    """Mimics client.responses.parse; each item in `script` is a parsed object or an exception."""
+    """Mimics client.responses.parse. Structure calls get `structure`, fragment calls get `functions`;
+    `fail` = how many first calls of each kind raise a validation error."""
 
-    def __init__(self, *script):
-        self.script, self.calls = list(script), []
+    def __init__(self, functions=(), fail_structure=0, fail_functions=0):
+        self.functions, self.calls = list(functions), []
+        self.fail = {"structure": fail_structure, "functions": fail_functions}
+        self.lock = threading.Lock()
         self.responses = self
 
     def parse(self, **kwargs):
-        self.calls.append(kwargs)
-        item = self.script.pop(0)
-        if isinstance(item, Exception):
-            raise item
-        return SimpleNamespace(output_parsed=item, status="completed", incomplete_details=None,
+        kind = "structure" if "Заполни только `units`" in kwargs["instructions"] else "functions"
+        with self.lock:
+            self.calls.append((kind, kwargs))
+            if self.fail[kind]:
+                self.fail[kind] -= 1
+                raise validation_error()
+        parsed = extraction() if kind == "structure" else Extraction(units=[], roles=[], functions=self.functions)
+        return SimpleNamespace(output_parsed=parsed, status="completed", incomplete_details=None,
                                usage=SimpleNamespace(input_tokens=100, output_tokens=20))
 
 
@@ -60,41 +67,48 @@ def test_input_excludes_preamble_and_toc():
     assert "УТВЕРЖДЕНО" not in text and "[toc]" not in text
 
 
+def test_chunks_keep_second_level_groups_together():
+    chunks = chunk_clauses(make_doc(), size=2)
+    assert [[c.clause_id for c in clauses] for _, clauses in chunks] == [["1", "1.1"], ["2.1", "2.1.а"]]
+    assert chunks[0][0] == "Структура"
+
+
 def test_success_logs_tokens_and_cleans_citations():
-    client = FakeClient(extraction(
+    client = FakeClient([
         fn("2.1", "анализирует результаты проверок"),                      # correct
         fn("2.1", "ведет реестр договоров", action="вести"),              # wrong clause -> repaired to 2.1.а
         fn("2.1", "утверждает бюджет департамента", action="утверждать"),  # nowhere in the doc -> dropped
         fn("2.1", "анализирует результаты проверок"),                      # duplicate -> removed
-    ))
+    ])
     result, step = extract_document(make_doc(), client=client)
     assert result.ok
     assert [(f.action, f.clause_id) for f in result.extraction.functions] == [("анализировать", "2.1"), ("вести", "2.1.а")]
-    assert (result.repaired, result.dropped) == (1, 1)
     assert result.extraction.units[0].clause_ids == ["1.1"]
-    assert (step.input_tokens, step.output_tokens) == (100, 20)
-    assert step.finished_at and step.model and "попыток 1" in step.notes
-    assert client.calls[0]["text_format"] is Extraction
-    assert client.calls[0]["reasoning"]["effort"]
+    n_calls = len(client.calls)
+    assert n_calls == 1 + len(chunk_clauses(make_doc()))
+    assert (step.input_tokens, step.output_tokens) == (100 * n_calls, 20 * n_calls)
+    assert step.finished_at and step.model and "отброшено" in step.notes
+    assert all(kw["text_format"] is Extraction and kw["reasoning"]["effort"] for _, kw in client.calls)
 
 
 def test_one_retry_on_validation_error():
-    client = FakeClient(validation_error(), extraction(fn("2.1", "анализирует результаты проверок")))
+    client = FakeClient([fn("2.1", "анализирует результаты проверок")], fail_structure=1)
     result, step = extract_document(make_doc(), client=client)
-    assert result.ok and len(client.calls) == 2
-    assert "попыток 2" in step.notes
+    assert result.ok and result.extraction.units
+    assert [k for k, _ in client.calls].count("structure") == 2
+    assert "повторов 1" in step.notes
 
 
 def test_second_failure_is_graceful():
-    client = FakeClient(validation_error(), validation_error())
+    client = FakeClient([fn("2.1", "анализирует результаты проверок")], fail_structure=2)
     result, step = extract_document(make_doc(), client=client)
     assert not result.ok and result.error
-    assert result.extraction.functions == []
-    assert "ошибка" in step.notes and len(client.calls) == 2
+    assert result.extraction.units == [] and result.extraction.functions  # partial result is kept
+    assert "неудачных 1" in step.notes
 
 
 def test_extract_all_runs_every_document():
-    client = FakeClient(*[extraction(fn("2.1", "анализирует результаты проверок")) for _ in range(2)])
+    client = FakeClient([fn("2.1", "анализирует результаты проверок")])
     results, trace = extract_all([make_doc("before-1"), make_doc("after-1")], client=client)
     assert set(results) == {"before-1", "after-1"} and all(r.ok for r in results.values())
     assert [s.step for s in trace] == ["extract:before-1", "extract:after-1"]

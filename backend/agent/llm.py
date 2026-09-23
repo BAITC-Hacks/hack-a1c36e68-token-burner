@@ -11,6 +11,7 @@ from backend.config import settings
 
 log = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 
 class LLMError(RuntimeError):
@@ -35,7 +36,8 @@ def get_client():
 
     if not settings.openai_api_key:
         raise LLMError("OPENAI_API_KEY не задан")
-    return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+    # explicit default: an empty OPENAI_BASE_URL in the environment would otherwise override it with ""
+    return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url or DEFAULT_BASE_URL)
 
 
 def call_structured(*, model: str, reasoning: str | None, instructions: str, input: str,
