@@ -49,7 +49,7 @@ docker compose up --build
 Нужен Python 3.12. Создайте окружение и установите зависимости:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
