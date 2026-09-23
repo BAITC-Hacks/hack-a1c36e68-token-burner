@@ -54,6 +54,41 @@ class Document(BaseModel):
         )
 
 
+# --- Extractor output (internal, not part of the exported contract) ---
+# No defaults here: OpenAI strict structured outputs require every field to be present.
+
+
+class ExtractedUnit(BaseModel):
+    name: str = Field(description="Полное наименование подразделения, как в документе")
+    short_name: str | None = Field(description="Аббревиатура, если есть (ДНМ)")
+    kind: Literal["block", "department", "division", "other"]
+    parent: str | None = Field(description="Подразделение, в которое входит")
+    clause_ids: list[str] = Field(description="Пункты, где подразделение определено или упомянуто в структуре")
+
+
+class ExtractedRole(BaseModel):
+    name: str = Field(description="Должность, как в документе")
+    unit: str | None = Field(description="Подразделение, к которому относится должность")
+    reports_to: list[str] = Field(description="Кому подчиняется (должности)")
+    clause_ids: list[str]
+
+
+class ExtractedFunction(BaseModel):
+    owner: str = Field(description="Подразделение или должность — исполнитель, как в документе")
+    modality: Literal["duty", "right", "responsibility"] = Field(description="обязанность/функция, право, ответственность")
+    action: str = Field(description="Действие, глагол в начальной форме: 'анализировать'")
+    object: str = Field(description="Объект действия: 'результаты непрерывного аудита'")
+    area: str = Field(description="Область ответственности: 'непрерывный аудит', 'ИТ-аудит'")
+    clause_id: str = Field(description="Идентификатор пункта-источника из входного списка, например 5.3.3.б")
+    quote: str = Field(description="Дословный непрерывный фрагмент текста пункта, подтверждающий функцию")
+
+
+class Extraction(BaseModel):
+    units: list[ExtractedUnit]
+    roles: list[ExtractedRole]
+    functions: list[ExtractedFunction]
+
+
 # --- result contract ---
 
 
