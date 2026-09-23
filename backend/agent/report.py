@@ -35,6 +35,46 @@ COUNT_LABELS = {"structure": "структура", "loss": "не найдено 
 MAX_CITES_PER_SIDE = 6
 
 
+def _subject(summary: str) -> str:
+    m = re.search(r"у «([^»]+)»", summary)
+    return m.group(1) if m else "подразделения"
+
+
+def _owners(summary: str) -> str:
+    m = re.search(r"у: ([^.]+)\.", summary)
+    names = [x.strip() for x in m.group(1).split(",")] if m else []
+    return " и ".join(names) if names else "подразделениями"
+
+
+def default_recommendation(f: Finding) -> str:
+    """One line per finding when the model gave none: built from the finding type and the unit."""
+    if f.type == "loss":
+        return ("Закрепить функцию за подразделением или зафиксировать намеренное исключение "
+                "в распорядительном документе.")
+    if f.type == "duplication":
+        return f"Разграничить зоны ответственности между {_owners(f.summary)} в положениях."
+    if f.type == "conflict":
+        return (f"Разделить выполнение и контроль одной деятельности у «{_subject(f.summary)}»: "
+                f"передать контроль независимому подразделению или зафиксировать компенсирующие меры.")
+    if f.type == "overlap":
+        return f"Уточнить формулировки обязанностей «{_subject(f.summary)}», чтобы разграничить выполнение и контроль."
+    if f.type == "transfer":
+        return "Отразить перенос в положении принимающего подразделения и в должностных инструкциях."
+    if f.type == "change":
+        return "Подтвердить, что изменение объёма функции сделано намеренно, и отразить его в положениях."
+    return "Отразить изменение структуры в положениях о подразделениях и штатном расписании."
+
+
+def fill_recommendations(result: AnalysisResult) -> int:
+    """Fill missing recommendations in place; model-written ones are kept. Returns how many were filled."""
+    filled = 0
+    for f in result.findings:
+        if not (f.recommendation or "").strip():
+            f.recommendation = default_recommendation(f)
+            filled += 1
+    return filled
+
+
 def cite(e: Evidence) -> str:
     return f"п. {e.clause_id}" + (f" (с. {e.page})" if e.page else "")
 
@@ -116,6 +156,7 @@ def _summary_input(result: AnalysisResult) -> str:
 
 def report(result: AnalysisResult, client=None) -> tuple[str, TraceStep]:
     step = TraceStep(step="report", started_at=datetime.now(timezone.utc), model=settings.model_report)
+    fill_recommendations(result)
     summary, note = fallback_summary(result), "вводный абзац по шаблону"
     try:
         call = call_structured(model=settings.model_report, reasoning="low", instructions=PROMPT,

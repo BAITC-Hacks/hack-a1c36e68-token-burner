@@ -49,3 +49,29 @@ def test_both_editions_are_cited_even_with_many_references():
     md = render_conclusion(r, "Абзац.")
     assert "  - До: «red8.pdf» п. 5.1 (с. 1)" in md and "и ещё 3" in md
     assert "  - После: «red9.pdf» п. 5.3.3 (с. 8)" in md
+
+
+def test_missing_recommendations_are_filled_by_type_and_model_ones_kept():
+    from backend.agent.report import fill_recommendations
+
+    r = result()
+    ev = r.findings[0].evidence
+    r.findings = [
+        Finding(id="F1", type="loss", severity="high", summary="ДККМ: «x» — не найдена.", evidence=ev, verified=True),
+        Finding(id="F2", type="duplication", severity="low", summary="Дублирование «y» (z) у: ДИТААД/ДОА, ДНМ. Текст.",
+                evidence=ev, verified=True),
+        Finding(id="F3", type="conflict", severity="low", summary="Конфликт интересов в редакции «до» у «ДККМ» (уверенность: high).",
+                evidence=ev, verified=True),
+        Finding(id="F4", type="overlap", severity="low", summary="Пересечение ответственности в редакции «после» у «ДНМ»: …",
+                evidence=ev, verified=True),
+        Finding(id="F5", type="change", severity="low", summary="s", evidence=ev, verified=True, recommendation="Своя."),
+    ]
+    assert fill_recommendations(r) == 4
+    rec = [f.recommendation for f in r.findings]
+    assert rec[0].startswith("Закрепить функцию за подразделением или зафиксировать намеренное исключение")
+    assert rec[1] == "Разграничить зоны ответственности между ДИТААД/ДОА и ДНМ в положениях."
+    assert rec[2].startswith("Разделить выполнение и контроль одной деятельности у «ДККМ»")
+    assert rec[3].startswith("Уточнить формулировки обязанностей «ДНМ»")
+    assert rec[4] == "Своя."
+    md, _ = report(r, client=FakeClient(summary="Итог."))
+    assert md.count("Рекомендация:") == 5
