@@ -35,6 +35,7 @@
     .stats strong{font-size:23px;font-weight:650;letter-spacing:-.5px}
     .stats .separator{color:#a7adb6}
     .stats .verified{color:var(--accent)}
+    .checks{display:flex;align-items:center;gap:12px 22px;flex-wrap:wrap;padding:12px 16px;margin-bottom:18px;border:1px solid var(--line);border-radius:5px;background:var(--paper);font-size:12px}.checks h2{font-size:13px}.checks strong{font-variant-numeric:tabular-nums}.analysis-cost{margin-left:auto;color:var(--muted)}
     .documents{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
     .document-set{border:1px solid var(--line);border-radius:5px;background:var(--paper);padding:12px 16px;display:flex;gap:20px;align-items:baseline}
     .document-set h2{font-size:11px;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;color:var(--muted)}
@@ -175,6 +176,7 @@
     .markdown h1,.markdown h2,.markdown h3{break-after:avoid}
     .markdown p,.markdown li{orphans:3;widows:3}
     .markdown table{font-size:9pt}
+    .markdown th,.markdown td{overflow-wrap:anywhere;padding:6px}.markdown table{table-layout:fixed}.result-actions button{display:none!important}.checks{break-inside:avoid}.markdown h4,.markdown h5,.markdown h6{break-after:avoid}
     .markdown tr{break-inside:avoid}
     .markdown thead{display:table-header-group}
     .markdown .md-table{overflow:visible}}
@@ -192,6 +194,7 @@
     .function-link{padding:5px 8px;color:var(--accent);font-size:12px;text-align:left}
     .no-link{color:var(--muted)}
     .finding-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:7px}
+    .finding-details{display:grid;gap:12px;margin:14px 0;max-height:460px;overflow:auto;border:1px solid var(--line);background:var(--paper);padding:16px;border-radius:5px}.finding-details article+article{border-top:1px solid var(--line);padding-top:12px}.finding-details .evidence-list{margin-top:8px}.confidence{margin:0 5px;font-weight:500;color:var(--muted)}.pagination{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:12px;font-size:12px}.pagination button{padding:5px 10px}
     .summary-card{text-align:left;padding:11px 14px;display:grid;gap:6px;align-content:start}
     .summary-card[aria-pressed=true],.filter-chip[aria-pressed=true],.all-toggle[aria-pressed=true]{border-color:var(--accent);background:var(--tint);color:var(--accent)}
     .summary-title{display:flex;align-items:baseline;justify-content:space-between;font-weight:600}.summary-title b{font-size:23px;line-height:1.15}
@@ -284,6 +287,10 @@
             <span class="separator">·</span>
             <span><strong>{{ result.stats.rejected }}</strong> отклонено верификатором</span>
           </div>
+          <section class="checks" aria-label="Сработавшие проверки">
+            <h2>Сработавшие проверки</h2><span v-if="hasStat('citations_corrected')">Исправлено ссылок: <strong>{{ result.stats.citations_corrected }}</strong></span><span v-if="hasStat('functions_dropped')">Отброшено функций: <strong>{{ result.stats.functions_dropped }}</strong></span><span>Отклонено находок: <strong>{{ result.stats.rejected }}</strong></span>
+            <span class="analysis-cost"><template v-if="hasStat('duration_s')">Время: <strong>{{ formatDuration(result.stats.duration_s) }}</strong></template><template v-if="hasStat('cost_usd')"><span v-if="hasStat('duration_s')"> · </span>Стоимость: <strong>{{ formatCost(result.stats.cost_usd) }} USD</strong></template></span>
+          </section>
           <div v-if="!result.analysis_complete || result.warnings.length" class="notice" role="status">
             <template v-if="!result.analysis_complete">
               <strong>Анализ неполный</strong>
@@ -358,6 +365,9 @@
             </button>
           </div>
           <p class="summary-note">Сводка по всему результату. Потери — функции, не найденные в комплекте «после». Конфликты — кандидаты на проверку сотрудником.</p>
+          <section v-if="activeFindingCard" class="finding-details" :aria-label="'Выводы: '+activeFindingCard.label">
+            <article v-for="finding in activeFindingCard.findings" :key="finding.id"><p class="finding-label"><code>{{ finding.id }}</code><span class="status-badge">{{ findingLabel(finding.type) }}</span><span v-if="finding.confidence" class="status-badge confidence">{{ confidenceLabel(finding.confidence) }}</span> · Важность: {{ severityLabels[finding.severity] || finding.severity }} · {{ finding.verified ? 'Подтверждено' : 'Отклонено' }}</p><p>{{ finding.summary }}</p><p v-if="!finding.verified" class="rejection-inline">{{ finding.rejection_reason }}</p><p v-if="!finding.function_ids?.length" class="muted">Связанные функции не указаны.</p><div class="evidence-list"><evidence-chip v-for="(ev,index) in finding.evidence" :key="index" :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev,$event)"></evidence-chip></div></article>
+          </section>
           <div class="filters">
             <span class="mode-label">{{ statusFilter==='changes' ? 'Только изменения' : statusFilter==='all' ? 'Все статусы' : functionLabels[statusFilter] }}</span>
             <button class="all-toggle" :aria-pressed="statusFilter==='all'" @click="statusFilter=statusFilter==='all' ? 'changes' : 'all'">Показать все</button>
@@ -393,7 +403,7 @@
                 </tr>
               </thead>
               <tbody>
-                <template v-for="fn in filteredFunctions" :key="fn.id">
+                <template v-for="fn in visibleFunctions" :key="fn.id">
                   <tr class="function-row" :class="{'is-expanded':expandedFunction===fn.id}" @click="toggleFunction(fn.id)">
                     <td>
                       <button class="function-title" :id="'function-'+fn.id" :aria-expanded="expandedFunction===fn.id" :aria-controls="'lineage-'+fn.id" @click.stop="toggleFunction(fn.id)">
@@ -446,7 +456,7 @@
                           <h3>Связанные выводы</h3>
                           <article v-for="finding in findingsFor(fn.id)" :key="finding.id" class="related-finding" :class="{unverified:!finding.verified}">
                             <p class="finding-label">
-                              <code>{{ finding.id }}</code>{{ finding.verified ? 'Подтверждено верификатором' : 'Отклонено верификатором' }}</p>
+                              <code>{{ finding.id }}</code><span class="status-badge">{{ findingLabel(finding.type) }}</span><span v-if="finding.confidence" class="status-badge confidence">{{ confidenceLabel(finding.confidence) }}</span> · {{ finding.verified ? 'Подтверждено верификатором' : 'Отклонено верификатором' }}</p>
                             <p>{{ finding.summary }}</p>
                             <p v-if="!finding.verified" class="rejection-inline">{{ finding.rejection_reason || 'Причина отклонения не указана.' }}</p>
                           </article>
@@ -463,6 +473,7 @@
               </tbody>
             </table>
           </div>
+          <nav v-if="pageCount>1" class="pagination" aria-label="Страницы функций"><span>Строки {{ (functionPage-1)*PAGE_SIZE+1 }}–{{ Math.min(functionPage*PAGE_SIZE,filteredFunctions.length) }} из {{ filteredFunctions.length }}</span><button :disabled="functionPage===1" @click="changePage(functionPage-1)">← Назад</button><span>{{ functionPage }} / {{ pageCount }}</span><button :disabled="functionPage===pageCount" @click="changePage(functionPage+1)">Далее →</button></nav>
         </section>
         <section v-show="activeTab==='conclusion'" id="panel-conclusion" role="tabpanel" aria-labelledby="tab-conclusion" tabindex="0">
           <div class="section-heading">
@@ -492,7 +503,7 @@
               <header class="rejected-heading">
                 <code>{{ finding.id }}</code>
                 <span class="status-badge">Отклонено</span>
-                <span class="muted">{{ findingTypes[finding.type] }} · Важность: {{ severityLabels[finding.severity] }}</span>
+                <span class="muted">{{ findingLabel(finding.type) }} · Важность: {{ severityLabels[finding.severity] || finding.severity }}</span><span v-if="finding.confidence" class="status-badge confidence">{{ confidenceLabel(finding.confidence) }}</span>
               </header>
               <h3 class="rejected-summary">{{ finding.summary }}</h3>
               <div class="rejection-reason">
@@ -543,9 +554,9 @@
     </dialog>
   </div>
   <script>
-    const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
+    const { createApp, ref, shallowRef, computed, watch, onMounted, onUnmounted, nextTick } = Vue;
     const SIMULATE_API = false; // Local development only: emulate API requests against demo_result.json.
-    const USE_CLAUSE_API = false; // Enable GET /api/clause when the backend is ready; Evidence remains the fallback.
+    const USE_CLAUSE_API = true; // Evidence remains the fallback if the source API is unavailable.
     const PIPELINE=[{id:'ingest',label:'Чтение документов',description:'Извлечение текста и пунктов'}, {id:'extract',label:'Извлечение структуры и функций',description:'Подразделения, действия и исполнители'}, {id:'prematch',label:'Предварительное сопоставление',description:'Поиск точных и близких совпадений'}, {id:'match',label:'Сопоставление редакций',description:'Изменения функций и ответственности'}, {id:'verify',label:'Верификация выводов',description:'Проверка ссылок и цитат'}, {id:'report',label:'Подготовка заключения',description:'Сводка подтверждённых выводов'}];
     const stepId=value => String(value || '').toLowerCase().split(':')[0];
     const simulationJobs=new Map();
@@ -640,13 +651,16 @@
     createApp({
       components: { EvidenceChip },
       setup() {
-        const result = ref(null), loading = ref(false), error = ref(''), activeTab = ref('structure'), selectedEvidence = ref(null);
+        const result = shallowRef(null), loading = ref(false), error = ref(''), activeTab = ref('structure'), selectedEvidence = ref(null);
+        const hasStat=key => Number.isFinite(result.value?.stats[key]);
+        const formatDuration=value => value<60 ? value.toLocaleString('ru',{maximumFractionDigits:1})+' с' : Math.floor(Math.round(value)/60)+' мин '+Math.round(value)%60+' с';
+        const formatCost=value => value.toLocaleString('ru',{minimumFractionDigits:2,maximumFractionDigits:4});
         const screen=ref('upload'), localDemo=ref(false), files=ref({before:[],after:[]}), dragSide=ref(''), fileError=ref(''), submitting=ref(false), jobId=ref('');
         const canAnalyze=computed(() => files.value.before.length+files.value.after.length>0);
         const job=ref({status:'queued',step:'',progress:0,trace:[]}), pollRetryable=ref(false);
         let flowController=null, flowVersion=0, pollTimer=null;
         function stopFlow() { flowVersion++; flowController?.abort(); clearTimeout(pollTimer); pollTimer=null; }
-        function backToUpload() { stopFlow(); closeSource(); screen.value='upload'; error.value=''; loading.value=false; submitting.value=false; history.replaceState(null,'',location.pathname); }
+        function backToUpload() { stopFlow(); closeSource(); jobId.value=''; screen.value='upload'; error.value=''; loading.value=false; submitting.value=false; history.replaceState(null,'',location.pathname); }
         function addFiles(side,incoming) {
           if(submitting.value) return; const invalid=[];
           for(const file of incoming) { if(!/\.(pdf|docx)$/i.test(file.name)) { invalid.push(file.name); continue; }
@@ -680,29 +694,37 @@
             if(!data || !['queued','running','done','error'].includes(data.status)) throw new Error('Сервис вернул неизвестный статус задания.');
             job.value={...data,trace:Array.isArray(data.trace) ? data.trace.filter(item => item && typeof item==='object') : job.value.trace};
             if(data.status==='error') { error.value=typeof data.error==='string' && data.error.trim() ? data.error : 'Анализ завершился с ошибкой. Вернитесь к документам и повторите попытку.'; pollRetryable.value=false; return; }
-            if(data.status==='done') { acceptResult(data.result,SIMULATE_API); return; }
+            if(data.status==='done') { acceptResult(data.result,SIMULATE_API || data.demo===true); return; }
             pollTimer=setTimeout(() => pollJob(version),1500);
           } catch(err) { if(version===flowVersion) { error.value=err.message; pollRetryable.value=true; } }
         }
         function resumePolling() { stopFlow(); flowController=new AbortController(); error.value=''; pollRetryable.value=false; pollJob(flowVersion); }
         const statusFilter=ref('changes'), unitFilter=ref(''), expandedFunction=ref(null), findingFilter=ref(''), currentHeading=ref('');
         const functionLabels={preserved:'Сохранена',transferred:'Передана',changed:'Изменена',lost:'Не найдена в комплекте «после»',duplicated:'Дублируется'};
-        const findingTypes={loss:'Не найдена в комплекте «после»',transfer:'Перенос',duplication:'Дублирование',conflict:'Конфликт интересов',structure:'Структура'};
+        const findingTypes={loss:'Не найдена в комплекте «после»',change:'Изменение',transfer:'Перенос',duplication:'Дублирование',conflict:'Конфликт интересов',overlap:'Пересечение ответственности',structure:'Структура'};
+        const findingLabel=type => Object.hasOwn(findingTypes,type) ? findingTypes[type] : 'Другой тип: '+(type || 'не указан');
+        const confidenceLabel=value => 'Уверенность: '+(value==='high' ? 'высокая' : value==='medium' ? 'средняя' : value==='low' ? 'низкая' : value);
         const severityLabels={high:'высокая',medium:'средняя',low:'низкая'};
         const statusCounts=computed(() => Object.fromEntries(Object.keys(functionLabels).map(status => [status,(result.value?.functions || []).filter(fn => fn.status===status).length])));
         const changedCount=computed(() => (result.value?.functions.length || 0)-statusCounts.value.preserved);
-        const findingCards=computed(() => Object.entries({loss:'Потери',transfer:'Переносы',duplication:'Дубли',conflict:'Конфликты'}).map(([type,label]) => {
+        const functionIndex=computed(() => new Map((result.value?.functions || []).map(fn => [fn.id,fn])));
+        const findingIndex=computed(() => { const index=new Map(); for(const finding of result.value?.findings || []) for(const id of finding.function_ids || []) { if(!index.has(id)) index.set(id,[]); index.get(id).push(finding); } return index; });
+        const findingCards=computed(() => {
+          const labels={loss:'Потери',transfer:'Переносы',duplication:'Дубли',conflict:'Конфликты'};
+          const types=[...new Set([...Object.keys(labels),...(result.value?.findings || []).map(f => f.type)])];
+          return types.map(type => {
           const findings=(result.value?.findings || []).filter(finding => finding.type===type);
-          const functionIds=new Set(findings.flatMap(finding => finding.function_ids || []).filter(id => result.value.functions.some(fn => fn.id===id)));
-          return {type,label,findings,functionIds,verified:findings.filter(f => f.verified===true).length,
+          const functionIds=new Set(findings.flatMap(finding => finding.function_ids || []).filter(id => functionIndex.value.has(id)));
+          return {type,label:Object.hasOwn(labels,type) ? labels[type] : findingLabel(type),findings,functionIds,verified:findings.filter(f => f.verified===true).length,
             severities:Object.entries(severityLabels).map(([id,label]) => ({id,label,count:findings.filter(f => f.severity===id).length})).filter(s => s.count)};
-        }));
+        }); });
         const activeFindingCard=computed(() => findingCards.value.find(card => card.type===findingFilter.value));
         function toggleFinding(type) { findingFilter.value=findingFilter.value===type ? '' : type; expandedFunction.value=null; }
         const rejectedFindings=computed(() => (result.value?.findings || []).filter(finding => finding.verified!==true));
-        const functionById=id => result.value.functions.find(fn => fn.id===id);
+        const functionById=id => functionIndex.value.get(id);
         async function openFunction(id) {
           resetFilters(); statusFilter.value='all'; activeTab.value='functions'; expandedFunction.value=id;
+          functionPage.value=Math.floor(filteredFunctions.value.findIndex(fn => fn.id===id)/PAGE_SIZE)+1;
           await nextTick();
           const button=document.getElementById('function-'+id);
           button?.scrollIntoView({block:'center'}); button?.focus({preventScroll:true});
@@ -726,8 +748,12 @@
           return (result.value?.functions || []).filter(fn => (statusFilter.value==='all' || (statusFilter.value==='changes' ? fn.status!=='preserved' : fn.status===statusFilter.value))
             && (!activeFindingCard.value || activeFindingCard.value.functionIds.has(fn.id)) && (!unit || [fn.owner_before,fn.owner_after].filter(Boolean).some(owner => matchesUnit(owner,unit))));
         });
+        const PAGE_SIZE=50, functionPage=ref(1), pageCount=computed(() => Math.max(1,Math.ceil(filteredFunctions.value.length/PAGE_SIZE)));
+        const visibleFunctions=computed(() => filteredFunctions.value.slice((functionPage.value-1)*PAGE_SIZE,functionPage.value*PAGE_SIZE));
+        watch([statusFilter,unitFilter,findingFilter,result],() => { functionPage.value=1; expandedFunction.value=null; },{flush:'sync'});
+        function changePage(page) { functionPage.value=Math.max(1,Math.min(page,pageCount.value)); expandedFunction.value=null; document.getElementById('panel-functions')?.scrollIntoView({block:'start'}); }
         const evidenceFor=(fn,side) => (fn.evidence || []).filter(ev => result.value.documents.find(doc => doc.doc_id===ev.doc_id)?.side===side);
-        const findingsFor=id => result.value.findings.filter(finding => (finding.function_ids || []).includes(id));
+        const findingsFor=id => findingIndex.value.get(id) || [];
         function toggleFunction(id) { expandedFunction.value=expandedFunction.value===id ? null : id; }
         function resetFilters() { statusFilter.value='changes'; unitFilter.value=''; findingFilter.value=''; }
         const sides = [{id:'before',label:'До реорганизации'},{id:'after',label:'После'}];
@@ -758,7 +784,8 @@
           const controller=new AbortController(); sourceRequest=controller;
           const timeout=setTimeout(() => controller.abort(),8000);
           try {
-            const response=await fetch(`/api/clause/${encodeURIComponent(ev.doc_id)}/${encodeURIComponent(ev.clause_id)}`,{signal:controller.signal});
+            const query=jobId.value ? '?job_id='+encodeURIComponent(jobId.value) : '';
+            const response=await fetch(`/api/clause/${encodeURIComponent(ev.doc_id)}/${encodeURIComponent(ev.clause_id)}${query}`,{signal:controller.signal});
             if(!response.ok) throw new Error('HTTP '+response.status);
             const clause=await response.json();
             if(typeof clause.text!=='string' || !clause.text.trim()) throw new Error('Нет текста пункта');
@@ -785,7 +812,7 @@
           localDemo.value=demo; activeTab.value='structure'; resetFilters(); expandedFunction.value=null; currentHeading.value=''; screen.value='results';
         }
         async function loadResult() {
-          stopFlow(); const version=flowVersion; flowController=new AbortController(); screen.value='demo'; loading.value=true; error.value='';
+          stopFlow(); closeSource(); jobId.value=''; const version=flowVersion; flowController=new AbortController(); screen.value='demo'; loading.value=true; error.value='';
           try { const data=await apiRequest('/api/demo',{signal:flowController.signal}); if(version===flowVersion) acceptResult(data,true); }
           catch(err) { if(version===flowVersion) error.value='Не удалось загрузить демо-результат. '+err.message; }
           finally { if(version===flowVersion) loading.value=false; }
@@ -793,6 +820,7 @@
         onMounted(() => { if(new URLSearchParams(location.search).get('demo')==='1') loadResult(); });
         onUnmounted(stopFlow);
         return {result,loading,error,activeTab,selectedEvidence,localDemo,sides,tabs,unitGroups,documentsFor,evidenceKey,selectEvidence,tabKey,loadResult,
+          hasStat,formatDuration,formatCost,findingLabel,confidenceLabel,PAGE_SIZE,functionPage,pageCount,visibleFunctions,changePage,
           screen,files,dragSide,fileError,submitting,canAnalyze,jobId,backToUpload,chooseFiles,dropFiles,fileSize,startAnalysis,job,pollRetryable,progressPercent,currentStepLabel,progressSteps,resumePolling,simulateAPI:SIMULATE_API,
           statusFilter,unitFilter,expandedFunction,functionLabels,owners,unitOptions,filteredFunctions,evidenceFor,findingsFor,toggleFunction,resetFilters,conclusionHtml,printConclusion,
           findingTypes,severityLabels,rejectedFindings,functionById,openFunction,statusCounts,changedCount,findingCards,findingFilter,activeFindingCard,toggleFinding,
