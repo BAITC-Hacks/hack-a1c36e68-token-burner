@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Контур изменений · Аудит реорганизации</title>
+  <style>
+    :root{--bg:#f4f5f7;--paper:#fff;--text:#242932;--muted:#616975;--line:#dce0e6;--accent:#3159b8;--tint:#eef3ff;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    [v-cloak]{display:none}button,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.45}
+    button:focus-visible,select:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+    button{border:1px solid var(--line);background:var(--paper);border-radius:5px;padding:8px 13px}button:hover{border-color:var(--accent)}
+    a{color:var(--accent)}h1,h2,h3,p{margin:0}h1{font-size:29px;letter-spacing:-.8px;line-height:1.25}h2{font-size:19px;letter-spacing:-.3px}h3{font-size:14px}
+    .topbar{height:58px;border-bottom:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 32px}
+    .brand{font-weight:750;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}.brand-mark{display:grid;place-items:center;background:var(--accent);color:#fff;width:26px;height:26px;border-radius:4px;font:700 17px var(--mono)}
+    .topbar-note,.muted{color:var(--muted)}.topbar-note{font-size:12px}.workspace{max-width:1440px;padding:28px 32px 40px;margin:auto}
+    .eyebrow{font-size:11px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+    .report-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}.state-label{border:1px solid var(--line);padding:5px 10px;border-radius:4px;background:var(--paper);font-size:12px;white-space:nowrap}
+    .state-label::before{content:"";display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin-right:7px}
+    .stats{display:flex;align-items:baseline;gap:12px;font-size:15px;margin:15px 0 20px;flex-wrap:wrap}.stats strong{font-size:23px;font-weight:650;letter-spacing:-.5px}.stats .separator{color:#a7adb6}.stats .verified{color:var(--accent)}
+    .documents{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}.document-set{border:1px solid var(--line);border-radius:5px;background:var(--paper);padding:12px 16px;display:flex;gap:20px;align-items:baseline}
+    .document-set h2{font-size:11px;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;color:var(--muted)}.document-list{flex:1;min-width:0}.document-line{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap}.document-line+.document-line{margin-top:5px}.document-name{font-weight:600;overflow-wrap:anywhere}.document-meta{font-size:12px;color:var(--muted)}
+    .notice{border:1px solid #bac6df;border-left:3px solid var(--accent);background:var(--tint);padding:12px 16px;border-radius:4px;margin-bottom:18px}.notice ul{margin:6px 0 0;padding-left:20px}.notice strong{display:block}.notice p{margin-top:4px}
+    .tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow-x:auto}.tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:12px 0 13px;white-space:nowrap;color:var(--muted);font-weight:600}
+    .tab:hover{color:var(--text);border-bottom-color:#bac6df}.tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}.count{font-size:11px;margin-left:7px;display:inline-block;padding:1px 6px;border-radius:4px;background:#e8ebef;color:var(--muted);font-variant-numeric:tabular-nums}.tab[aria-selected=true] .count{background:#e0e9fd;color:var(--accent)}
+    .section-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:16px}.section-heading p{margin-top:3px;font-size:13px;color:var(--muted)}.section-meta{color:var(--muted);font-size:12px;white-space:nowrap}
+    .unit-group{display:grid;grid-template-columns:168px minmax(0,1fr);gap:20px;border-top:1px solid var(--line);padding:16px 0}.group-label{display:flex;align-items:baseline;gap:8px}.group-label h3{font-size:13px}.unit-list{display:grid;gap:10px}
+    .unit-card{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:20px;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:13px 16px}.unit-title{font-weight:650}.unit-comment{font-size:13px;color:var(--muted);margin-top:5px}.unit-route{margin-top:6px;font-size:12px;color:var(--muted)}.unit-route span{color:var(--accent);margin:0 6px}
+    .evidence-list{display:flex;gap:6px;flex-wrap:wrap;align-content:start;align-items:start}.evidence-chip{font:12px/1.4 var(--mono);border:1px solid var(--line);border-radius:4px;padding:4px 7px;white-space:nowrap;color:var(--muted);background:#fafbfc}.evidence-chip b{color:var(--text);font-weight:600}.evidence-chip[aria-pressed=true]{color:var(--accent);border-color:var(--accent);background:var(--tint)}.evidence-chip[aria-pressed=true] b{color:var(--accent)}
+    .empty{padding:22px;color:var(--muted);border:1px dashed var(--line);border-radius:5px;text-align:center}.group-empty{font-size:13px;color:var(--muted);padding:2px 0}.footer{border-top:1px solid var(--line);margin-top:24px;padding-top:12px;display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
+    .loading{padding:100px 24px;text-align:center}.spinner{width:22px;height:22px;display:inline-block;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}@keyframes spin{to{transform:rotate(360deg)}}
+    .error{max-width:680px;margin:60px auto}.error button{margin-top:12px}code{font-family:var(--mono)}
+    @media(max-width:800px){.workspace{padding:20px 16px}.topbar{padding:0 16px}.topbar-note{display:none}h1{font-size:24px}.documents{grid-template-columns:1fr}.unit-group{grid-template-columns:1fr;gap:8px}.unit-card{grid-template-columns:1fr;gap:12px}.tabs{gap:20px}.report-heading{align-items:start}.state-label{white-space:normal}.section-meta{display:none}}
+    @media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+  </style>
+  <script src="vendor/vue.global.prod.js"></script>
+</head>
+<body>
+  <noscript>Для просмотра результатов включите JavaScript в браузере.</noscript>
+  <div id="app" v-cloak>
+    <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">≋</span>Контур изменений</div><span class="topbar-note">Аудит организационных документов</span></header>
+    <main class="workspace">
+      <div v-if="loading" class="loading" role="status"><span class="spinner" aria-hidden="true"></span><p>Загружаем результат анализа…</p></div>
+      <div v-else-if="error" class="notice error" role="alert"><strong>Не удалось загрузить результат</strong><p>{{ error }}</p><button @click="loadResult">Повторить</button></div>
+      <template v-else-if="result">
+        <header class="result-header">
+          <div class="report-heading"><div><p class="eyebrow">Результат сравнения</p><h1>Анализ реорганизации</h1></div><span class="state-label">{{ result.analysis_complete ? 'Анализ завершён' : 'Неполный анализ' }}</span></div>
+          <div class="stats" aria-label="Статистика выводов"><span><strong>{{ result.stats.findings_total }}</strong> выводов</span><span class="separator">·</span><span class="verified"><strong>{{ result.stats.verified }}</strong> подтверждено</span><span class="separator">·</span><span><strong>{{ result.stats.rejected }}</strong> отклонено верификатором</span></div>
+          <div v-if="!result.analysis_complete || result.warnings.length" class="notice" role="status">
+            <template v-if="!result.analysis_complete"><strong>Анализ неполный</strong><p>Часть документов не обработана. Отсутствие функции в комплекте «после» нельзя считать подтверждённым.</p></template>
+            <strong v-else>Предупреждения анализа</strong><ul v-if="result.warnings.length"><li v-for="(warning,index) in result.warnings" :key="index">{{ warning }}</li></ul>
+          </div>
+          <div class="documents"><section v-for="side in sides" :key="side.id" class="document-set"><h2>{{ side.label }}</h2><div class="document-list"><div v-for="doc in documentsFor(side.id)" :key="doc.doc_id" class="document-line"><span class="document-name">{{ doc.name }}</span><span class="document-meta"><code>{{ doc.doc_id }}</code> · <template v-if="doc.pages != null">{{ doc.pages }} стр. · </template>{{ doc.clause_count }} пунктов</span></div><span v-if="!documentsFor(side.id).length" class="muted">Документы не указаны</span></div></section></div>
+        </header>
+        <nav class="tabs" role="tablist" aria-label="Разделы результата">
+          <button v-for="(tab,index) in tabs" :key="tab.id" :id="'tab-'+tab.id" role="tab" class="tab" :aria-selected="activeTab===tab.id" :aria-controls="'panel-'+tab.id" :tabindex="activeTab===tab.id ? 0 : -1" @click="activeTab=tab.id" @keydown="tabKey($event,index)">{{ tab.label }}<span v-if="tab.count != null" class="count">{{ tab.count }}</span></button>
+        </nav>
+        <section v-show="activeTab==='structure'" id="panel-structure" role="tabpanel" aria-labelledby="tab-structure" tabindex="0">
+          <div class="section-heading"><div><h2>Изменения структуры</h2><p>Подразделения и должности в двух редакциях документов.</p></div><span class="section-meta">{{ result.units.length }} объектов сравнения</span></div>
+          <section v-for="group in unitGroups" :key="group.id" class="unit-group"><div class="group-label"><h3>{{ group.label }}</h3><span class="count">{{ group.units.length }}</span></div><div class="unit-list">
+            <article v-for="(unit,index) in group.units" :key="index" class="unit-card"><div><h3 class="unit-title">{{ unit.name }}</h3><p v-if="unit.before_ref && unit.after_ref && unit.before_ref!==unit.after_ref" class="unit-route">{{ unit.before_ref }} <span>→</span> {{ unit.after_ref }}</p><p v-if="unit.comment" class="unit-comment">{{ unit.comment }}</p></div><div class="evidence-list"><evidence-chip v-for="(ev,i) in unit.evidence" :key="i" :evidence="ev" :selected="selectedEvidence===evidenceKey(ev)" @select="selectEvidence(ev)"></evidence-chip><span v-if="!unit.evidence?.length" class="muted">Ссылки не указаны</span></div></article>
+            <p v-if="!group.units.length" class="group-empty">Нет подразделений с этим статусом</p>
+          </div></section>
+        </section>
+        <!-- Function tab -->
+        <!-- Conclusion tab -->
+        <!-- Rejected tab -->
+        <footer class="footer"><span>Каждый вывод связан с пунктами исходных документов.</span><span>{{ localDemo ? 'Демонстрационный результат' : 'Результат анализа' }}</span></footer>
+      </template>
+    </main>
+  </div>
+  <script>
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+    const evidenceKey = ev => JSON.stringify([ev.doc_id, ev.clause_id, ev.quote]);
+    const EvidenceChip = {
+      props: ['evidence', 'selected'], emits: ['select'],
+      template: `<button type="button" class="evidence-chip" :aria-pressed="selected" :title="evidence.quote + (evidence.page == null ? '' : ' · Стр. ' + evidence.page)" @click.stop="$emit('select')">{{ evidence.doc_id }} <b>§ {{ evidence.clause_id }}</b></button>`
+    };
+    createApp({
+      components: { EvidenceChip },
+      setup() {
+        const result = ref(null), loading = ref(true), error = ref(''), activeTab = ref('structure'), selectedEvidence = ref(null);
+        const localDemo = new URLSearchParams(location.search).get('demo') !== '1';
+        const sides = [{id:'before',label:'До реорганизации'},{id:'after',label:'После'}];
+        const unitLabels = {created:'Созданы',preserved:'Сохранены',transformed:'Преобразованы',eliminated:'Упразднены'};
+        const tabs = computed(() => [
+          {id:'structure',label:'Структура',count:result.value?.units.length}
+          // Additional result tabs are added below.
+        ]);
+        const unitGroups = computed(() => Object.entries(unitLabels).map(([id,label]) => ({id,label,units:result.value?.units.filter(u => u.status===id) || []})));
+        const documentsFor = side => result.value.documents.filter(doc => doc.side===side);
+        function selectEvidence(ev) { const key=evidenceKey(ev); selectedEvidence.value=selectedEvidence.value===key ? null : key; }
+        function tabKey(event,index) {
+          const key=event.key, count=tabs.value.length;
+          const target=key==='ArrowRight' ? (index+1)%count : key==='ArrowLeft' ? (index+count-1)%count : key==='Home' ? 0 : key==='End' ? count-1 : -1;
+          if(target<0) return;
+          event.preventDefault(); activeTab.value=tabs.value[target].id;
+          nextTick(() => document.getElementById('tab-'+activeTab.value)?.focus());
+        }
+        async function loadResult() {
+          loading.value=true; error.value='';
+          try {
+            const response=await fetch(localDemo ? './demo_result.json' : '/api/demo', {signal:AbortSignal.timeout(15000)});
+            if(!response.ok) throw new Error('HTTP '+response.status);
+            const data=await response.json();
+            if(!data || typeof data!=='object' || Array.isArray(data)) throw new Error('Некорректный ответ');
+            result.value={documents:[],units:[],functions:[],findings:[],conclusion_md:'',analysis_complete:true,warnings:[],trace:[],...data,stats:{findings_total:0,verified:0,rejected:0,...data.stats}};
+          } catch (err) { error.value=`${localDemo ? 'Не удалось прочитать демо-результат.' : 'Сервис демо-результатов недоступен.'} ${err.name==='TimeoutError' ? 'Превышено время ожидания.' : err.message}`; }
+          finally { loading.value=false; }
+        }
+        onMounted(loadResult);
+        return {result,loading,error,activeTab,selectedEvidence,localDemo,sides,tabs,unitGroups,documentsFor,evidenceKey,selectEvidence,tabKey,loadResult};
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
