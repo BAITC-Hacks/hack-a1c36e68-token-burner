@@ -162,13 +162,18 @@ Structure (§3.4–3.9):
 - ДККМ lost audit performers: red8 3.8 lists «Менеджер по аудиту», «Директор проектов ДККМ»;
   red9 3.9 lists only «Директор проектов», «Руководитель направления».
 
-Lost (no counterpart in red9):
-- Right to form quality-control groups — red8 5.6.2.
-- Right to propose scope of external assessment of БВА — red8 5.6.3.
-- Bringing consultation results to management — red8 5.7.2.
-- ДККМ: «готовит предложения для включения в план работ» red8 5.5.10; «предложения по
-  повышению профессионального уровня» red8 5.5.8; quarterly reporting detail red8 5.5.5
-  generalised in red9 5.5.3.
+Lost (no counterpart anywhere in red9 — checked 5.6, 10.x, 11.5):
+- Right to form quality-control groups — red8 5.6.2 (high).
+- Right to propose scope of external assessment of БВА — red8 5.6.3 (high).
+- Bringing consultation results to management — red8 5.7.2 (medium).
+
+Changed / narrowed for ДККМ (NOT lost — the function exists at other units in red9):
+- red8 5.5.10 «предложения в план работ» -> red9 5.3.3 / 5.4.2 (ДИТААД/ДОА, ДНМ);
+  ДККМ keeps only consolidation, red9 5.5.7.
+- red8 5.5.8 «предложения по проф. уровню» -> red9 5.3.9 / 5.4.6; ДККМ instead has
+  5.5.6 «организует обучение».
+- red8 5.5.5 quarterly + annual reporting -> red9 5.5.3 without periodicity;
+  periodicity remains at Главный аудитор, red9 5.1.6 (was there in red8 too).
 
 Transferred (must NOT be reported as lost):
 - Assurance-map / СВК interaction: ДНМ red8 5.4.4 -> ДИТААД/ДОА red9 5.3.3.
