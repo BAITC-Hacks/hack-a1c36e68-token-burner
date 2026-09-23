@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false  # copy .env.example; DEMO_MODE=1 runs without an API key
+    volumes:
+      - ./data/jobs:/app/data/jobs  # jobs, uploads and the extraction cache survive restarts
+    restart: unless-stopped
