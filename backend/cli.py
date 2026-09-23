@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from backend.agent.pipeline import UnreadableInput, run
+from backend.agent.pipeline import MissingApiKey, UnreadableInput, run
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         result = run(args.before, args.after, progress=progress, use_cache=not args.no_cache)
-    except UnreadableInput as exc:
+    except (UnreadableInput, MissingApiKey) as exc:
         print(f"Ошибка: {exc}", file=sys.stderr)
         return 1
     Path(args.output).write_text(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",

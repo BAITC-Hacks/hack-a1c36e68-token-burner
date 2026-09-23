@@ -35,10 +35,11 @@ class LLMCall:
 def get_client():
     from openai import OpenAI
 
-    if not settings.openai_api_key:
+    if not settings.openai_api_key and not settings.openai_base_url:
         raise LLMError("OPENAI_API_KEY не задан")
-    # explicit default: an empty OPENAI_BASE_URL in the environment would otherwise override it with ""
-    return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url or DEFAULT_BASE_URL)
+    # explicit default: an empty OPENAI_BASE_URL in the environment would otherwise override it with "";
+    # a self-hosted OpenAI-compatible server (vLLM) usually accepts any key
+    return OpenAI(api_key=settings.openai_api_key or "EMPTY", base_url=settings.openai_base_url or DEFAULT_BASE_URL)
 
 
 def call_structured(*, model: str, reasoning: str | None, instructions: str, input: str,

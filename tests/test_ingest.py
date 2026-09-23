@@ -125,3 +125,25 @@ def test_broken_file_gives_warning_not_crash(tmp_path):
     path.write_bytes(b"not a pdf")
     doc = ingest_file(path, "before", "b1")
     assert doc.clauses == [] and doc.warnings
+
+
+def test_skipped_clause_number_does_not_merge_neighbours(tmp_path):
+    path = tmp_path / "gap.txt"
+    path.write_text(
+        "5. Права и обязанности\n"
+        "5.1. Общие права отдела определены уставом.\n"
+        "5.5. Директор отдела:\n"              # 5.2–5.4 are missing
+        "5.5.1. организует работу отдела;\n"
+        "5.5.2. готовит отчеты;\n"
+        "5.5.3. согласует планы;\n"
+        "5.5.5. ведет реестр договоров;\n"      # 5.5.4 is missing in the source
+        "5.5.6. участвует в совещаниях.\n"
+        "5.9. Работники отдела обязаны соблюдать сроки.\n"  # a larger gap within the same parent
+        "6. Ответственность\n"
+        "6.1. Директор отвечает за результаты.\n",
+        encoding="utf-8",
+    )
+    doc = ingest_file(path, "before", "b1")
+    assert ids(doc) == ["5", "5.1", "5.5", "5.5.1", "5.5.2", "5.5.3", "5.5.5", "5.5.6", "5.9", "6", "6.1"]
+    assert doc.clause("5.5.3").text == "согласует планы;"
+    assert doc.clause("5.5.5").text == "ведет реестр договоров;"

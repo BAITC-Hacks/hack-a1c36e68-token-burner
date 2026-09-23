@@ -11,6 +11,7 @@ from backend import main
 from backend.agent.schemas import AnalysisResult
 from backend.config import ROOT, settings
 
+REAL_PIPELINE = main.run_pipeline
 ORG = Path(__file__).parent / "fixtures" / "org"
 SAMPLES = ROOT / "data" / "samples"
 STEPS = ["ingest", "extract", "prematch", "match", "verify", "report"]
@@ -149,3 +150,23 @@ def test_restart_marks_unfinished_jobs_as_error(api):
     main.load_jobs()
     job = api.get("/api/jobs/stale1").json()
     assert job["status"] == "error" and "перезапущен" in job["error"]
+
+
+def test_no_api_key_demo_mode_serves_the_demo(api, monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(main, "settings", replace(main.settings, demo_mode=True, openai_api_key=""))
+    monkeypatch.setattr(main, "run_pipeline", REAL_PIPELINE)
+    assert api.get("/api/health").json()["demo_mode"] is True
+    assert api.get("/api/demo").json()["findings"]
+    job = wait(api, upload(api, [txt()], [txt("deleted.txt")]))
+    assert job["status"] == "done", job["error"]
+
+
+def test_no_api_key_without_demo_fails_the_first_job_with_a_clear_message(api, monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(settings, "openai_base_url", None)
+    monkeypatch.setattr(main, "run_pipeline", REAL_PIPELINE)
+    assert api.get("/api/health").status_code == 200  # the server starts fine
+    job = wait(api, upload(api, [txt()], [txt("deleted.txt")]))
+    assert job["status"] == "error"
+    assert "OPENAI_API_KEY" in job["error"] and "DEMO_MODE=1" in job["error"]

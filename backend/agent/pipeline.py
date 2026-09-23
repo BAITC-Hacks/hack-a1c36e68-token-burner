@@ -19,6 +19,14 @@ ProgressFn = Callable[[str, float, str], None]
 
 class UnreadableInput(ValueError):
     """A file gave no text at all; the message names the file(s)."""
+
+
+class MissingApiKey(RuntimeError):
+    """No OPENAI_API_KEY for a real run (checked per job, not at startup)."""
+
+
+NO_KEY = ("Не задан OPENAI_API_KEY: для анализа документов нужен доступ к модели. Укажите ключ в .env "
+          "(или OPENAI_BASE_URL своего сервера) либо включите демо-режим DEMO_MODE=1.")
 INCOMPLETE_LOSS = ("Входные данные обработаны не полностью: отсутствие функции в комплекте «после» "
                    "не подтверждается")
 
@@ -76,6 +84,9 @@ def run(before: list[str | Path], after: list[str | Path], progress: ProgressFn 
     if unreadable:  # the whole job fails, naming every file that could not be read
         raise UnreadableInput("Не удалось прочитать файлы (повреждены или скан без текстового слоя, OCR не "
                               "поддерживается): " + "; ".join(unreadable))
+
+    if client is None and not settings.openai_api_key and not settings.openai_base_url:
+        raise MissingApiKey(NO_KEY)
 
     say("extract", 0.08, f"Извлечение функций из {len(docs)} документов")
     extracted, steps = run_extract(docs, client=client, use_cache=use_cache)

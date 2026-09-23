@@ -20,53 +20,86 @@ SECTIONS = [
 ]
 REJECTED_TITLE = "Отклонено верификатором (в выводах не учитывается)"
 FORBIDDEN = re.compile(r"утрач|уничтож|ликвидир", re.I)
-MAX_CITES = 4
 
 
 class ReportSummary(BaseModel):
     summary: str
 
 
-def cite(e: Evidence, names: dict[str, str]) -> str:
-    page = f", с. {e.page}" if e.page else ""
-    return f"«{names.get(e.doc_id, e.doc_id)}», п. {e.clause_id}{page}"
+DISCLAIMER = "_Выводы носят рекомендательный характер и требуют проверки ответственным сотрудником._"
+NOT_FOUND = 'не найдена в загруженном комплекте "после"'
+LEVEL = {"high": "высокая", "medium": "средняя", "low": "низкая"}
+COUNT_LABELS = {"structure": "структура", "loss": "не найдено в «после»", "change": "изменено",
+                "transfer": "перенесено", "duplication": "дублирование", "conflict": "конфликт интересов",
+                "overlap": "пересечение ответственности"}
+MAX_CITES_PER_SIDE = 6
+
+
+def cite(e: Evidence) -> str:
+    return f"п. {e.clause_id}" + (f" (с. {e.page})" if e.page else "")
+
+
+def _citations(f: Finding, docs: dict[str, tuple[str, str]]) -> list[str]:
+    """One line per side, grouped by document, so both editions are always visible."""
+    lines = []
+    for side, label in (("before", "До"), ("after", "После")):
+        evidence = [e for e in f.evidence if docs.get(e.doc_id, ("", ""))[1] == side]
+        if not evidence:
+            continue
+        shown, rest = evidence[:MAX_CITES_PER_SIDE], len(evidence) - MAX_CITES_PER_SIDE
+        by_doc: dict[str, list[str]] = {}
+        for e in shown:
+            by_doc.setdefault(docs[e.doc_id][0], []).append(cite(e))
+        text = "; ".join(f"«{name}» {', '.join(refs)}" for name, refs in by_doc.items())
+        lines.append(f"  - {label}: {text}" + (f" и ещё {rest}" if rest > 0 else ""))
+    return lines
+
+
+def _label(f: Finding) -> str:
+    if f.type == "conflict" and f.confidence:
+        return f"уверенность {LEVEL[f.confidence]}"
+    return f"важность {LEVEL[f.severity]}"
+
+
+def _summary(f: Finding) -> str:
+    if f.type == "loss" and NOT_FOUND not in f.summary:
+        return f"{f.summary.rstrip('.')} — {NOT_FOUND}."
+    return f.summary
 
 
 def fallback_summary(result: AnalysisResult) -> str:
     ok = [f for f in result.findings if f.verified]
-    count = {t: sum(f.type == t for f in ok) for t, _ in SECTIONS}
-    text = (f"Сравнение выявило {len(ok)} подтверждённых выводов: изменений структуры — {count['structure']}, "
-            f'функций, не найденных в загруженном комплекте "после", — {count["loss"]}, изменённых функций — '
-            f"{count['change']}, групп перенесённых функций — {count['transfer']}, случаев дублирования — "
-            f"{count['duplication']}, кандидатов на проверку конфликта интересов — {count['conflict']}.")
+    text = (f"Сравнение дало {len(ok)} подтверждённых выводов; ниже они сгруппированы по типам, "
+            f"у каждого указаны пункты обеих редакций.")
     if not result.analysis_complete:
         text = "Анализ неполный: часть входных данных не обработана, выводы о потерях предварительные. " + text
     return text
 
 
 def render_conclusion(result: AnalysisResult, summary: str) -> str:
-    names = {d.doc_id: d.name for d in result.documents}
+    docs = {d.doc_id: (d.name, d.side) for d in result.documents}
     before = ", ".join(f"«{d.name}»" for d in result.documents if d.side == "before")
     after = ", ".join(f"«{d.name}»" for d in result.documents if d.side == "after")
-    lines = ["# Заключение по сравнению организационных документов", "",
-             f"Комплект «до»: {before or '—'}. Комплект «после»: {after or '—'}.", ""]
+    ok = [f for f in result.findings if f.verified]
+    counts = ", ".join(f"{COUNT_LABELS[t]} — {n}" for t, _ in SECTIONS if (n := sum(f.type == t for f in ok)))
+    lines = ["# Заключение по сравнению организационных документов", "", DISCLAIMER, "",
+             f"Комплект «до»: {before or '—'}. Комплект «после»: {after or '—'}.",
+             f"Подтверждено верификатором {len(ok)} из {len(result.findings)} выводов"
+             + (f": {counts}." if counts else "."), ""]
     if not result.analysis_complete:
         lines += ["> **Анализ неполный.** " + " ".join(result.warnings or ["Часть данных не обработана."]), ""]
     lines += [summary, ""]
-    ok = [f for f in result.findings if f.verified]
     for ftype, title in SECTIONS:
         group = [f for f in ok if f.type == ftype]
         if not group:
             continue
         lines += [f"## {title}", ""]
         for f in group:
-            refs = "; ".join(cite(e, names) for e in f.evidence[:MAX_CITES])
-            more = f" и ещё {len(f.evidence) - MAX_CITES}" if len(f.evidence) > MAX_CITES else ""
-            lines.append(f"- **{f.id}** ({f.severity}). {f.summary} [{refs}{more}]")
+            lines.append(f"- **{f.id}** · {_label(f)}. {_summary(f)}")
+            lines += _citations(f, docs)
             if f.recommendation:
                 lines.append(f"  - Рекомендация: {f.recommendation}")
         lines.append("")
-    lines += [f"_Подтверждено верификатором: {len(ok)} из {len(result.findings)}._", ""]
     rejected = [f for f in result.findings if not f.verified]
     if rejected:  # always the last block
         lines += [f"## {REJECTED_TITLE}", ""]

@@ -18,7 +18,8 @@ CAPITAL = re.compile(r"[А-ЯЁA-Z«]")
 TOC_LINE = re.compile(r"(\.{4,}|…{2,}|\s\d{1,3})\s*$")
 FOOTER = re.compile(r"\n\s*\d{1,3}\s*$")
 LETTERS = "абвгдежзиклмнопрстуфхцчшщэюя"
-MAX_GAP = 3  # tolerated jump in numbering, e.g. 5.5.3 -> 5.5.6
+MAX_GAP = 3  # tolerated jump for a first child or when climbing up a level, e.g. 5.5.3 -> 5.6
+MAX_SIBLING_GAP = 10  # tolerated jump between siblings of one parent: numbers skipped in the source (5.5.3 -> 5.5.9)
 
 
 # --- text extraction ---
@@ -129,7 +130,9 @@ def _is_successor(prev: tuple[int, ...] | None, cand: tuple[int, ...]) -> bool:
         if len(cand) <= k or cand[:k] != prev[:k]:
             continue
         base = prev[k] if k < len(prev) else 0
-        if 1 <= cand[k] - base <= MAX_GAP and all(x == 1 for x in cand[k + 1:]):
+        sibling = k < len(prev) and len(cand) == k + 1  # same parent, same level: 5.5.3 -> 5.5.9, 5.5.6 -> 5.9
+        limit = MAX_SIBLING_GAP if sibling else MAX_GAP
+        if 1 <= cand[k] - base <= limit and all(x == 1 for x in cand[k + 1:]):
             return True
     return False
 
